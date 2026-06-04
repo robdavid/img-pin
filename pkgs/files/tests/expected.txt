@@ -1,0 +1,6 @@
+This file
+
+Has some odd
+<inserted something here>
+
+blank lines

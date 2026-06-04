@@ -1,0 +1,57 @@
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  secretName: tls-cert
+  privateKey:
+    rotationPolicy: Always
+    algorithm: RSA
+    encoding: PKCS1
+    size: 4096
+  duration: 8760h # 1 Year
+  renewBefore: 720h #2 months
+  subject:
+    organizations:
+      - domain
+  commonName: domain
+  isCA: false
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    - harbor.domain
+  issuerRef:
+    name: ca-issuer
+    kind: ClusterIssuer
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  repo: https://helm.goharbor.io
+  chart: harbor
+  version: 1.15.1
+  targetNamespace: harbor
+  valuesContent: |-
+    imagePullPolicy: IfNotPresent
+    expose:
+      type: ingress
+      ingress:
+        hosts:
+          core: harbor.domain
+      tls:
+        enabled: true
+        certSource: secret
+        secret:
+          secretName: tls-cert
+    persistence:
+      enabled: true
+    externalURL: https://harbor.domain
+    nginx:
+      image:
+        tag: v2.11.2

@@ -1,0 +1,7 @@
+img-pin
+.vscode/launch.json
+vault.yaml
+nexus.yaml
+*.tmp.yaml
+.sessions/
+coverage.out

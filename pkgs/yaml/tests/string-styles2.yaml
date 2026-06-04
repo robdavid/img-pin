@@ -1,0 +1,8 @@
+quoted: "this is just some words"
+
+literal: |
+  these
+  are
+  actual
+  lines
+

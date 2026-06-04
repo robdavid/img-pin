@@ -1,0 +1,25 @@
+ubuntu1:
+  image: docker.io/ubuntu:20.04
+
+ubuntu2:
+  image: ubuntu
+  imageTag: 22.04
+
+vault:
+    image:
+      registry: public.ecr.aws
+      repository: docker/library/vault
+      tag: 1.13.3
+
+initContainers:
+  - name: myinit
+    image: docker.io/busybox:1.0
+
+stumper:
+  image:
+    image: docker.io/apline:3.22.4
+
+maybestumper:
+  - image:
+    - level2:
+        image: nginx:1.30-apline

@@ -1,0 +1,92 @@
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: harbor
+#   labels:
+#     app: harbor
+#     role: storage
+# spec:
+#   storageClassName: ""
+#   capacity:
+#     storage: 10Gi
+#   accessModes:
+#     - ReadWriteMany
+#   hostPath:
+#     path: "/mnt/raid/Shared/pv/harbor"
+# apiVersion: cert-manager.io/v1
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: harbor
+#   namespace: harbor
+# spec:
+#   storageClassName: "" # Empty string must be explicitly set otherwise default StorageClass will be set
+#   volumeName: harbor
+#   accessModes:
+#     - ReadWriteMany
+#   resources:
+#     requests:
+#       storage: 10Gi
+# ---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  secretName: tls-cert
+  privateKey:
+    rotationPolicy: Always
+    algorithm: RSA
+    encoding: PKCS1
+    size: 4096
+  duration: 8760h # 1 Year
+  renewBefore: 720h #2 months
+  subject:
+    organizations:
+      - domain
+  commonName: domain
+  isCA: false
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    - harbor.domain
+  issuerRef:
+    name: ca-issuer
+    kind: ClusterIssuer
+---
+
+# Deploying through a helm chart resource.
+# This is just some comment to introduce formatting.
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  repo: https://helm.goharbor.io
+  chart: harbor
+  version: 1.15.1
+  targetNamespace: harbor
+  valuesContent: |-
+    imagePullPolicy: IfNotPresent
+    expose:
+      type: ingress
+      ingress:
+        hosts:
+          core: harbor.domain
+
+      # I think there should be comments and whitespace in the
+      # values content too.
+      tls:
+        enabled: true
+        certSource: secret
+        secret:
+          secretName: tls-cert
+    persistence:
+      enabled: true
+    externalURL: https://harbor.domain
