@@ -1,0 +1,101 @@
+images:
+    - source:
+        registry: docker.io
+        repository: goharbor/harbor-core
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/harbor-core
+        tag: v2.11.1
+        digest: sha256:c017dd84ee96df33f54677fce6a03e3dc8e00e2557447edc6015e42f34452236
+      created: "2024-08-15T10:02:19Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/harbor-jobservice
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/harbor-jobservice
+        tag: v2.11.1
+        digest: sha256:30edb2ca02e57bf6cbcac36fdea373ba6551942637c9f404c127cc8c9446f837
+      created: "2024-08-15T10:02:43Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/harbor-portal
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/harbor-portal
+        tag: v2.11.1
+        digest: sha256:e35d3cac38395f0c306d83ac9b587c73a93188040ec018f7e8fcfe015e507175
+      created: "2024-08-15T10:01:50Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/registry-photon
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/registry-photon
+        tag: v2.11.1
+        digest: sha256:5645d459af2ba7200020a3473bc345ae87a2e2e189375b9a04cd6ec035c850fa
+      created: "2024-08-15T10:04:40Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/harbor-registryctl
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/harbor-registryctl
+        tag: v2.11.1
+        digest: sha256:7bdbfc97215e25879ff5e6de25f1e343b7816251458813c03a77d6b692f1b88c
+      created: "2024-08-15T10:05:05Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/harbor-db
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/harbor-db
+        tag: v2.11.1
+        digest: sha256:6b40bd47abae66669c05d00b479bd41a2a016d9d50ef25adadfc929bc9d4fb38
+      created: "2024-08-15T09:57:33Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/redis-photon
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/redis-photon
+        tag: v2.11.1
+        digest: sha256:76a158e5c3a2edac5d0d77311244111843d0bbfe543c12e691b49e8e3dba7f6c
+      created: "2024-08-15T10:06:36Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/trivy-adapter-photon
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/trivy-adapter-photon
+        tag: v2.11.1
+        digest: sha256:b4bfaabbbaaca306c5e9c36dd438a5745bfc1af58e0810a74677f9f022348958
+      created: "2024-08-15T10:06:03Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/nginx-photon
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/nginx-photon
+        tag: v2.11.1
+        digest: sha256:b7a54e6b04ffe19096cc5a788fa3364bc2dea742c26a990ea3270bf20eaa723d
+      created: "2024-08-15T10:03:46Z"
+    - source:
+        registry: docker.io
+        repository: goharbor/harbor-exporter
+        tag: v2.11.1
+      digest:
+        registry: docker.io
+        repository: goharbor/harbor-exporter
+        tag: v2.11.1
+        digest: sha256:22caf9ff7131a278674bff2ed2494d7a47ee49ee6a8c6ed859740000d0322bca
+      created: "2024-08-15T10:07:38Z"

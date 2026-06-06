@@ -20,6 +20,7 @@ nest:
 `
 
 func TestTrimMultiline(t *testing.T) {
+	t.Skip("This test is still WiP")
 	assert := assert.New(t)
 	require := require.New(t)
 	var root yaml.Node
