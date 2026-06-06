@@ -28,6 +28,9 @@ func (ip *ImageParts) UpdateImage(img *Image) {
 		img.Repository = ip.Group + "/" + ip.Name
 	} else if ip.Name != "" {
 		img.Repository = ip.Name
+	} else if ip.Group != "" {
+		_, name := img.GroupAndName()
+		img.Repository = ip.Group + "/" + name
 	}
 	if ip.Tag != "" {
 		img.Tag = ip.Tag
