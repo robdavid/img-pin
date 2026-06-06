@@ -32,9 +32,9 @@ func (k8s *K8SResource) Verify() error {
 	return k8s.digester.VerifyTargets(k8s.targets, k8s.options)
 }
 
-func (k8s *K8SResource) Cleanup() error { return nil }
-
-func (k8s *K8SResource) CanDigest() bool { return true }
+func (k8s *K8SResource) Cleanup() error                { return nil }
+func (k8s *K8SResource) CanDigest() bool               { return true }
+func (k8s *K8SResource) Expand() ([]*yaml.Node, error) { return []*yaml.Node{k8s.resource}, nil }
 
 type K8SWorkloadHandler struct{}
 

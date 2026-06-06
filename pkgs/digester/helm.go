@@ -305,3 +305,11 @@ func (hp *HelmProcessor) Save() (*yaml.Node, error) {
 func (hp *HelmProcessor) Cleanup() error {
 	return hp.Deployment.Cleanup()
 }
+
+func (hp *HelmProcessor) Expand() (docs []*yaml.Node, err error) {
+	var docContent []byte
+	if docContent, err = hp.Deployment.Render(); err != nil {
+		return
+	}
+	return yu.StreamDocsIn(bytes.NewBuffer(docContent))
+}

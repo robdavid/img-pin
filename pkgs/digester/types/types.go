@@ -41,6 +41,8 @@ type Resource interface {
 
 	// Verify checks all digests are present and correct
 	Verify() error
+
+	Expand() ([]*yaml.Node, error)
 }
 
 // HelmOptions holds basic deployment options

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -26,16 +27,22 @@ func TestDigestK3S(t *testing.T) {
 	defer os.Remove(tempFile)
 	eh.Check(digester.CreateDigests(tempFile))
 	content := eh.Try(os.ReadFile(tempFile))
+	re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
+	matches := re.FindAll(content, -1)
+	assert.Equal(t, 10, len(matches))
 	fmt.Printf("content:\n%s\n", content)
 }
 
 func TestDigestK3SPatch(t *testing.T) {
 	defer test.ReportErr(t)
-	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
-	defer os.Remove(tempFile)
-	eh.Check(digester.CreateDigests(tempFile,
-		digester.UpdateMethod(types.UpdatePatch)))
-	content := eh.Try(os.ReadFile(tempFile))
+	tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
+	defer tempDir.Delete()
+	eh.Check(digester.CreateDigests(tempDir.First(),
+		digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
+	content := eh.Try(os.ReadFile(tempDir.First()))
+	re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
+	matches := re.FindAll(content, -1)
+	assert.Equal(t, 10, len(matches))
 	fmt.Printf("content:\n%s\n", content)
 }
 
@@ -46,6 +53,23 @@ func TestDigestVerifyK3S(t *testing.T) {
 	err := digester.VerifyDigests(tempFile)
 	assert.ErrorIs(t, err, images.ErrNoDigest)
 	fmt.Printf("%v\n", err)
+}
+
+func TestDigestKube(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
+	defer tempDir.Delete()
+	dig := eh.Try(digester.DigestKube(tempDir.First(), digester.UseLockfile))
+	assert.Greater(len(dig.Resources), 30)
+	var buffer bytes.Buffer
+	eh.Check(digester.WriteCombinedDigests([]*digester.Digester{dig}, &buffer))
+	re := regexp.MustCompile(`image: docker\.io/goharbor/.*:v2\.11\.1\@sha256:[a-z0-9]{64}`)
+	matches := re.FindAll(buffer.Bytes(), -1)
+	assert.Equal(9, len(matches))
+	reImg := regexp.MustCompile(`image:`)
+	matches = reImg.FindAll(buffer.Bytes(), -1)
+	assert.Equal(9, len(matches))
 }
 
 func TestDigestK8S(t *testing.T) {
