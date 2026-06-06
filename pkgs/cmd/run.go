@@ -30,7 +30,7 @@ func ConfigureLogging(opts *UserOpts) {
 }
 
 func CreateImageOptions(opts *UserOpts) (imageOptions []images.ImageOption, requestCounters images.RequestCounters) {
-	if opts.UpdateDigests || opts.Dockerfiles {
+	if opts.UpdateDigests || opts.Dockerfiles || opts.KubeExpand {
 		opts.IncludeTag = true
 	}
 
@@ -84,17 +84,21 @@ func CreateDigestOptions(opts *UserOpts) (imageOptions []images.ImageOption, dig
 
 func Run(opts *UserOpts, args []string) (requestCounters images.RequestCounters, err error) {
 	ConfigureLogging(opts)
-	if !(opts.Yamlfiles || opts.Dockerfiles || opts.Image) {
+	if !(opts.Yamlfiles || opts.Dockerfiles || opts.Image || opts.KubeExpand) {
 		return nil, fmt.Errorf("%w: please supply one of --yaml, --dockerfile, or --image", ErrNoAction)
 	}
 	if len(args) == 0 {
 		return nil, ErrNoInputs
 	}
-	if opts.Yamlfiles {
+	if opts.Yamlfiles || opts.KubeExpand {
 		var digesterOptions []digester.Option
 		_, digesterOptions, requestCounters = CreateDigestOptions(opts)
 		noLocks := slices.Filter(args, func(name string) bool { return !strings.HasSuffix(name, ".lock.yaml") })
-		err = processYamlResources(noLocks, opts, digesterOptions)
+		if opts.KubeExpand {
+			err = processKubeResource(noLocks, opts, digesterOptions)
+		} else {
+			err = processYamlResources(noLocks, opts, digesterOptions)
+		}
 	} else {
 		var imageOptions []images.ImageOption
 		imageOptions, requestCounters = CreateImageOptions(opts)
@@ -175,6 +179,21 @@ func processYamlResources(files []string, opts *UserOpts, digesterOptions []dige
 
 		if err != nil && !opts.VerifyDigests && !opts.BatchMode {
 			return // Aborting as soon as an issue is found
+		}
+	}
+	return
+}
+
+func processKubeResource(files []string, opts *UserOpts, digesterOptions []digester.Option) (err error) {
+	digests := make([]*digester.Digester, len(files))
+	for n, file := range files {
+		if digests[n], err = digester.DigestKube(file, digesterOptions...); err != nil {
+			return
+		}
+	}
+	if !opts.Lock {
+		if err = digester.WriteCombinedDigests(digests, os.Stdout); err != nil {
+			return
 		}
 	}
 	return

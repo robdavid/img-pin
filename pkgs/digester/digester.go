@@ -54,9 +54,10 @@ func (r *SimpleResource) Cleanup() error {
 	return nil
 }
 
-func (*SimpleResource) CanDigest() bool { return false }
-func (*SimpleResource) Digest() error   { panic("Digest called on SimpleResource - not supported") }
-func (*SimpleResource) Verify() error   { panic("Verify called on SimpleResource - not supported") }
+func (*SimpleResource) CanDigest() bool                 { return false }
+func (*SimpleResource) Digest() error                   { panic("Digest called on SimpleResource - not supported") }
+func (*SimpleResource) Verify() error                   { panic("Verify called on SimpleResource - not supported") }
+func (r *SimpleResource) Expand() ([]*yaml.Node, error) { return []*yaml.Node{r.Node}, nil }
 
 type Options struct {
 	updateMethod   types.UpdateMethod
@@ -232,17 +233,23 @@ func (ky *Digester) LoadFile(filename string) (err error) {
 }
 
 func (ky *Digester) WriteAnyLocks() error {
-	if ky.lockfile != nil {
+	if ky.lockfile != nil && ky.options.generateLocks {
 		return ky.lockfile.Save()
 	}
 	return nil
 }
 
 func (ky *Digester) Read(input io.Reader) (err error) {
-	defer Catch(&err)
-	ky.Docs = Try(yu.StreamDocsIn(input))
+	if ky.Docs, err = yu.StreamDocsIn(input); err != nil {
+		return
+	}
 	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
 	log.Debug("found {{.ndocs}} document(s) in {{.file}}")
+	return ky.ReadDocs()
+}
+
+func (ky *Digester) ReadDocs() (err error) {
+	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
 	ky.Resources = make([]types.Resource, len(ky.Docs))
 nextDoc:
 	for n, doc := range ky.Docs {
@@ -263,6 +270,21 @@ nextDoc:
 		Check(ky.Resources[n].Load(doc))
 	}
 	return
+}
+
+func (ky *Digester) ExpandResources() (err error) {
+	newDocs := make([]*yaml.Node, 0, len(ky.Docs))
+	for _, resource := range ky.Resources {
+		var edocs []*yaml.Node
+		if edocs, err = resource.Expand(); err != nil {
+			return
+		}
+		newDocs = append(newDocs, edocs...)
+	}
+	ky.Docs = newDocs
+	ky.Cleanup()
+
+	return ky.ReadDocs()
 }
 
 func (ky *Digester) CreateDigests() (err error) {
@@ -340,7 +362,9 @@ func (ky *Digester) WriteUsingMethod(original io.Reader, output io.Writer) (err 
 
 func (ky *Digester) Cleanup() (err error) {
 	for _, doc := range ky.Resources {
-		err = ferrors.Join(err, doc.Cleanup())
+		if doc != nil {
+			err = ferrors.Join(err, doc.Cleanup())
+		}
 	}
 	return
 }
@@ -429,4 +453,31 @@ func VerifyDigests(filename string, options ...Option) (err error) {
 	Check(verifier.LoadFile(filename))
 	Check(verifier.VerifyDigests())
 	return
+}
+
+func DigestKube(filename string, options ...Option) (digester *Digester, err error) {
+	defer Handle(func(e error) {
+		err = fmt.Errorf("%s: %w", filename, e)
+	})
+	slog := slog.With("file", filename)
+	digester = NewDigester(options...)
+	defer digester.Cleanup()
+	Check(digester.LoadFile(filename))
+	slog.Debug("{{.file}}: {{.ndoc}} initial documents", "ndoc", len(digester.Docs))
+	Check(digester.ExpandResources())
+	slog.Debug("{{.file}}: {{.ndoc}} expanded documents", "ndoc", len(digester.Docs))
+	Check(digester.CreateDigests())
+	Check(digester.WriteAnyLocks())
+	return
+}
+
+func WriteCombinedDigests(digests []*Digester, output io.Writer) (err error) {
+	defer Catch(&err)
+	totalLen := slices.Fold(digests, 0, func(total int, digest *Digester) int { return total + len(digest.Resources) })
+	finalNodes := make([]*yaml.Node, 0, totalLen)
+	for _, d := range digests {
+		docs := slices.Map(d.Resources, func(r types.Resource) *yaml.Node { return Try(r.Save()) })
+		finalNodes = append(finalNodes, docs...)
+	}
+	return yu.StreamDocsOut(output, finalNodes...)
 }

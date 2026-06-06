@@ -18,6 +18,7 @@ import (
 type UserOpts struct {
 	Yamlfiles      bool
 	Dockerfiles    bool
+	KubeExpand     bool
 	SkipAuth       bool
 	SkipPostVerify bool
 	SkipNotFound   bool
@@ -50,6 +51,7 @@ func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
 	flag.BoolVarP(&opts.Dockerfiles, "dockerfile", "d", false, "Process arguments as Dockerfile path names, patching in place as required")
 	flag.StringVar(&opts.FileDesc, "file-source", "", "A descriptive file source to print in messages")
 	flag.BoolVarP(&opts.Image, "image", "i", false, "arguments are image names to determine the hashes of")
+	flag.BoolVarP(&opts.KubeExpand, "kube", "K", false, "all documents in all arguments that expand to Kubernetes resources are expanded")
 	flag.BoolVarP(&opts.LaxParsing, "lax", "l", false, "Use a more permissive regex-based parser for Dockerfiles (works with templated files)")
 	flag.BoolVarP(&opts.Lock, "lock", "k", false, "Generate/update lock file")
 	flag.StringVarP(&opts.Lockfile, "lock-file", "f", "", "The name of the lock file to use")
@@ -60,7 +62,7 @@ func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
 	flag.BoolVarP(&opts.IncludeTag, "preserve-tags", "t", false, "Retain any tag in the generated digest")
 	flag.BoolVarP(&opts.SkipAuth, "skip-auth", "a", false, "Skip digest of unauthorized private repos")
 	flag.BoolVarP(&opts.SkipNotFound, "skip-not-found", "N", false, "Skip images that can't be found in the registry")
-	flag.BoolVarP(&opts.SkipPostVerify, "skip-post-verify", "K", false, "Skip post verification that all images have digests")
+	flag.BoolVarP(&opts.SkipPostVerify, "skip-post-verify", "P", false, "Skip post verification that all images have digests")
 	flag.BoolVarP(&opts.SkipV1Schema, "skip-v1-schema", "V", false, "Skips images that won't digest because they use the old V1 schema")
 	flag.BoolVarP(&opts.StrictParsing, "strict", "s", false, "Use a more strict parser for Dockerfiles (fails on syntax errors)")
 	flag.BoolVarP(&opts.TrimMultiline, "trim-multiline", "T", false, "Trims trailing whitespace from the end of literal multi-line strings")
