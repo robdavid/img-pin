@@ -19,3 +19,14 @@ func TestShortAgePolicy(t *testing.T) {
 	assert.ErrorIs(err, images.ErrImageTooRecent)
 	assert.True(time.Since(created) < 365*24*time.Hour)
 }
+
+func TestUpdateGroup(t *testing.T) {
+	assert := assert.New(t)
+	img, err := images.Parse("ubuntu:24.04")
+	assert.NoError(err)
+	ip := images.ImageParts{Registry: "public.ecr.aws", Group: "library"}
+	ip.UpdateImage(img)
+	assert.Equal("public.ecr.aws", img.Registry)
+	assert.Equal("library/ubuntu", img.Repository)
+	assert.Equal("24.04", img.Tag)
+}
