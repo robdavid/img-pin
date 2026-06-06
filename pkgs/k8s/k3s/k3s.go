@@ -3,6 +3,7 @@ package k3s
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/skipping"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
+	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"gopkg.in/yaml.v3"
@@ -30,9 +32,10 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
 type HelmChartDeployment struct {
-	options  types.HelmOptions
-	values   *yaml.Node
-	resource *yaml.Node
+	options     types.HelmOptions
+	kubeVersion string
+	values      *yaml.Node
+	resource    *yaml.Node
 }
 
 func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
@@ -41,6 +44,11 @@ func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 		Repository: yu.Get[string](doc, "spec", "repo").GetOr(""),
 		Version:    yu.Get[string](doc, "spec", "version").GetOr(""),
 	}
+	hc.kubeVersion, _ = kube.GetClusterVersion()
+	slog.Debug("Loaded HelmChart Deployment, chart={{.chart}}, repository={{.repository}}, version={{.version}}, detected cluster={{.kubeVersion}}",
+		"chart", hc.options.ChartName, "repository", hc.options.Repository, "version", hc.options.Version,
+		"kubeVersion", hc.kubeVersion)
+
 	var valuesNode yaml.Node
 	var values string
 	values = yu.Get[string](doc, "spec", "valuesContent").GetOr("")
@@ -69,6 +77,9 @@ func (hc *HelmChartDeployment) Render() (output []byte, err error) {
 	}
 	if hc.options.Repository != "" {
 		helmCommand = append(helmCommand, "--repo", hc.options.Repository)
+	}
+	if hc.kubeVersion != "" {
+		helmCommand = append(helmCommand, "--dry-run=server")
 	}
 	output, err = run.Run(helmCommand...)
 	return
