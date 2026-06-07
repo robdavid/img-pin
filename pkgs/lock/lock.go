@@ -167,9 +167,6 @@ func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption
 		lf.Index[imageKey] = &lf.Locks.Images[len(lf.Locks.Images)-1]
 		lf.Index[imageData.Digest.String()] = &lf.Locks.Images[len(lf.Locks.Images)-1]
 	} else {
-		if _, err = images.ApplyPolicies(image, options...); err != nil {
-			return
-		}
 		imageKey := imageKey(image)
 		imageData := lf.Index[imageKey]
 		slog.Debug("lockfile lookup of {{.key}} gives {{.digest}}", "key", imageKey, "digest", imageData)
