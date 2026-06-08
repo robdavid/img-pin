@@ -308,7 +308,22 @@ func (hp *HelmProcessor) Expand() (docs []*yaml.Node, err error) {
 	docs = Try(hp.Deployment.Render())
 	namespace := hp.Deployment.Options().Namespace
 	for _, doc := range docs {
+		Check(SetResourceNamespace(doc, namespace))
+	}
+	return
+}
+
+func SetResourceNamespace(doc *yaml.Node, namespace string) (err error) {
+	defer Catch(&err)
+	if kind, ok := yu.Get[string](doc, "kind").GetOK(); ok {
 		Check(yu.Put(doc, namespace, "metadata", "namespace"))
+		if kind == "List" {
+			if items, ok := yu.GetNode(doc, "items").GetOK(); ok {
+				for _, child := range items.Content {
+					Check(SetResourceNamespace(child, namespace))
+				}
+			}
+		}
 	}
 	return
 }

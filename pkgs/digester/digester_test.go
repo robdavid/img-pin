@@ -72,6 +72,16 @@ func TestDigestKube(t *testing.T) {
 	assert.Equal(9, len(matches))
 }
 
+func TestDigestKubeList(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	tempFile := helpers.CopyToTemp(t, "tests/akri.yaml")
+	defer os.Remove(tempFile)
+	dig := eh.Try(digester.DigestKube(tempFile, digester.UseLockfile))
+	digester.WriteCombinedDigests([]*digester.Digester{dig}, os.Stdout)
+	assert.Greater(len(dig.Resources), 19)
+}
+
 func TestDigestK8S(t *testing.T) {
 	defer test.ReportErr(t)
 	require := require.New(t)
