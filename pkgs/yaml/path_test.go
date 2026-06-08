@@ -166,6 +166,24 @@ func TestGet(t *testing.T) {
 	assert.True(nothing.IsEmpty())
 }
 
+func TestGetList(t *testing.T) {
+	defer test.ReportErr(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	bytes := readTestFile("values.yaml")
+	var node yamlv3.Node
+	Check(yamlv3.Unmarshal(bytes, &node))
+	_, ok := yaml.MatchOne(&node, yaml.PathOf("proxy", "components"))
+	assert.False(ok)
+	optNode := yaml.GetNode(&node, "proxy", "components")
+	require.True(optNode.HasValue())
+	seq := optNode.Ref()
+	assert.Equal(yamlv3.SequenceNode, seq.Kind)
+	e0 := yaml.Get[string](seq, 0)
+	assert.Equal(opt.Value("core"), e0)
+}
+
 func TestAliasedNodes(t *testing.T) {
 	const content = `
 default: &defaultFlower
