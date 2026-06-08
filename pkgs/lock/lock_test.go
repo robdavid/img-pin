@@ -1,12 +1,15 @@
 package lock_test
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/img-pin/pkgs/images"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	"github.com/stretchr/testify/assert"
@@ -26,6 +29,8 @@ const testLockYaml = `images:
 `
 
 func TestLoadSuccess(t *testing.T) {
+	defer test.ReportErr(t)
+
 	require := require.New(t)
 	assert := assert.New(t)
 
@@ -42,7 +47,7 @@ func TestLoadSuccess(t *testing.T) {
 
 	img := lf.Locks.Images[0]
 	assert.Equal("library/ubuntu:latest", img.Source.String())
-	assert.Equal("sha256:deadbeef", img.Digest.Digest)
+	assert.Equal("sha256:deadbeef", img.Digest.Try().Digest)
 	assert.Equal(2026, img.Created.Year())
 	assert.Equal(time.May, img.Created.Month())
 	assert.Equal(26, img.Created.Day())
@@ -254,4 +259,49 @@ func TestLockPredigested(t *testing.T) {
 	require.NoError(err)
 	err = lf.VerifyDigest(img3)
 	require.NoError(err)
+}
+
+func TestGetDigest_SkippedByPolicy(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	lf := lock.Make()
+	lf.Locking = true
+
+	// Image that will be skipped by policy
+	const imageName = "docker.io/ubuntu:24.04"
+	img, err := images.Parse(imageName)
+	require.NoError(err)
+
+	// Use SkipPolicy to skip this image
+	policy := images.SkipPolicy(images.ImageParts{
+		Registry: "docker.io",
+		// Group:    "skipped-image",
+		Name: "ubuntu",
+		Tag:  "24.04",
+	})
+
+	// Call GetDigest with the skip policy.
+	// The GetDigest implementation in lock.go calls image.GetDigest (via Digest in images.go),
+	// which applies policies.
+	// Since it's skipped, Digest should return ErrSkipImage.
+	// lock.GetDigest should catch this error and create a lock entry with no digest.
+	_, err = lf.GetDigest(img, images.AddPolicy(policy))
+	assert.ErrorIs(err, images.ErrSkipImage)
+
+	// Verify it's in the index
+	assert.True(lf.Index[img.String()] != nil)
+
+	// Now unlock and check it's found and returns ErrSkipImage
+	lf.Locking = false
+	_, err = lf.GetDigest(img)
+	assert.ErrorIs(err, images.ErrSkipImage)
+
+	out, err := yaml.Marshal(&lf.Locks)
+	require.NoError(err)
+	yaml := string(out)
+	assert.Contains(yaml, "source:")
+	assert.NotContains(yaml, "digest:")
+	buf := bytes.NewBuffer(out)
+	io.Copy(os.Stdout, buf)
 }
