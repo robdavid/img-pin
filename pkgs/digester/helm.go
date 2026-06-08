@@ -1,7 +1,6 @@
 package digester
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"os"
@@ -173,7 +172,7 @@ func searchForImageDetails(root *yaml.Node) (details []ImageDetails) {
 			if _, err := images.Parse(d.String()); err == nil {
 				details = append(details, d)
 			} else {
-				fmt.Fprintf(os.Stderr, "%s: cannot parse %q as an image", os.Args[0], d.String())
+				fmt.Fprintf(os.Stderr, "%s: cannot parse %q as an image\n", os.Args[0], d.String())
 			}
 		}
 	}
@@ -282,9 +281,7 @@ func (hp *HelmProcessor) Digest() (err error) {
 func (hp *HelmProcessor) Verify() (err error) {
 	defer Catch(&err)
 	yd := MakeYamlDigester(hp.digester)
-	resourceYaml := Try(hp.Deployment.Render())
-	inbuf := bytes.NewBuffer(resourceYaml)
-	docs := Try(yu.StreamDocsIn(inbuf))
+	docs := Try(hp.Deployment.Render())
 	for docn, doc := range docs {
 		targets := yu.MatchImagePaths(doc)
 		if verErr := yd.VerifyTargets(targets, hp.options); verErr != nil {
@@ -307,9 +304,11 @@ func (hp *HelmProcessor) Cleanup() error {
 }
 
 func (hp *HelmProcessor) Expand() (docs []*yaml.Node, err error) {
-	var docContent []byte
-	if docContent, err = hp.Deployment.Render(); err != nil {
-		return
+	defer Catch(&err)
+	docs = Try(hp.Deployment.Render())
+	namespace := hp.Deployment.Options().Namespace
+	for _, doc := range docs {
+		Check(yu.Put(doc, namespace, "metadata", "namespace"))
 	}
-	return yu.StreamDocsIn(bytes.NewBuffer(docContent))
+	return
 }

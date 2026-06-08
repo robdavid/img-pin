@@ -50,13 +50,14 @@ type HelmOptions struct {
 	ChartName  string
 	Repository string
 	Version    string
+	Namespace  string
 }
 
 type Deployment interface {
 	BaseResource
 
 	// Render generates the YAML resources that describes the deployment
-	Render() ([]byte, error)
+	Render() ([]*yaml.Node, error)
 
 	// DefaultValues returns the YAML resources that describe the Helm
 	// chart's default values.
