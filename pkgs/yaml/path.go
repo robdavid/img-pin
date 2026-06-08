@@ -286,7 +286,7 @@ func collect(node *yaml.Node, path Path, wild bool, parent Path) (matches []Path
 }
 
 // MatchOne returns a single path that matches the one given. If there is no match,
-// a nil node is return with a false boolean. If there is one match, it is returned
+// a nil node is returned with a false boolean. If there is one match, it is returned
 // along with a true boolean. If there is more than one, the first is returned with
 // a false boolean.
 func MatchOne(node *yaml.Node, path Path) (*yaml.Node, bool) {
