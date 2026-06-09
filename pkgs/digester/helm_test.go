@@ -9,7 +9,7 @@ import (
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestValuesSearch(t *testing.T) {

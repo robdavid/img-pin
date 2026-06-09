@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/genutil-go/slices"

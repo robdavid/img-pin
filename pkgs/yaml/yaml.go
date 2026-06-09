@@ -9,7 +9,7 @@ import (
 
 	. "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/img-pin/pkgs/files"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var ErrNotDocNode = errors.New("not a document node")

@@ -1,7 +1,7 @@
 package types
 
 import (
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // UpdateMethod describe methods for modifying a YAML file in place,

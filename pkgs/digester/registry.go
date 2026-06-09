@@ -3,7 +3,7 @@ package digester
 import (
 	"github.com/robdavid/img-pin/pkgs/digester/skipping"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ResourceHandler matches a specific kind of resource by looking at the

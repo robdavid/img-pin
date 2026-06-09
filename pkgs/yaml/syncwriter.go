@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // SyncWrite is an attempt to produce output YAML with blank lines in the same

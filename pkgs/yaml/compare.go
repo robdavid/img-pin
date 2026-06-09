@@ -1,6 +1,6 @@
 package yaml
 
-import y3 "gopkg.in/yaml.v3"
+import y3 "go.yaml.in/yaml/v4"
 
 // EqualData reports whether two YAML AST trees contain the same data.
 //

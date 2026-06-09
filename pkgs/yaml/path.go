@@ -11,7 +11,7 @@ import (
 	"github.com/robdavid/genutil-go/functions"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/genutil-go/slices"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var ErrUnknownPE = errors.New("Unknown path element content")

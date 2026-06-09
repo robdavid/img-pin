@@ -14,7 +14,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/ferrors"
 	"github.com/robdavid/img-pin/pkgs/images"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ImageDetails holds image fields detected from chart and deployment values,

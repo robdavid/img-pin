@@ -5,7 +5,7 @@ import (
 	"regexp"
 
 	"github.com/robdavid/genutil-go/slices"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type SigPath struct {

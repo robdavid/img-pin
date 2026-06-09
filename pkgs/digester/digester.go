@@ -18,7 +18,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/images"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var (
@@ -432,7 +432,9 @@ func CreateDigests(filename string, options ...Option) (err error) {
 		defer verifier.Cleanup()
 		slog.Debug("{{.file}}: performing verification pass")
 		Check(verifier.Read(&buffer))
-		Check(compareDocs(digester.DigestedDocs, verifier.Docs))
+		if err = compareDocs(digester.DigestedDocs, verifier.Docs); err != nil {
+			return
+		}
 		Check(verifier.VerifyDigests())
 		slog.Info("{{.file}}: round-trip verified {{.ndocs}} docs", "ndocs", len(verifier.Docs))
 	}

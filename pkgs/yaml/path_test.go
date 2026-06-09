@@ -12,7 +12,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	yamlv3 "gopkg.in/yaml.v3"
+	yamlv3 "go.yaml.in/yaml/v4"
 )
 
 func TestPathString(t *testing.T) {

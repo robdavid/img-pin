@@ -8,7 +8,7 @@ import (
 	"github.com/robdavid/genutil-go/errors/test"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestSimpleStylesCompare(t *testing.T) {
