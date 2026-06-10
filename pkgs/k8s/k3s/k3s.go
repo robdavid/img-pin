@@ -1,6 +1,7 @@
 package k3s
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -43,6 +44,7 @@ func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 		ChartName:  yu.Get[string](doc, "spec", "chart").GetOr(""),
 		Repository: yu.Get[string](doc, "spec", "repo").GetOr(""),
 		Version:    yu.Get[string](doc, "spec", "version").GetOr(""),
+		Namespace:  yu.Get[string](doc, "spec", "targetNamespace").GetOr(""),
 	}
 	hc.kubeVersion, _ = kube.GetClusterVersion()
 	slog.Debug("Loaded HelmChart Deployment, chart={{.chart}}, repository={{.repository}}, version={{.version}}, detected cluster={{.kubeVersion}}",
@@ -58,7 +60,7 @@ func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 	return nil
 }
 
-func (hc *HelmChartDeployment) Render() (output []byte, err error) {
+func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	defer Catch(&err)
 	if hc.options.ChartName == "" {
 		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
@@ -81,8 +83,9 @@ func (hc *HelmChartDeployment) Render() (output []byte, err error) {
 	if hc.kubeVersion != "" {
 		helmCommand = append(helmCommand, "--dry-run=server")
 	}
+	var output []byte
 	output, err = run.Run(helmCommand...)
-	return
+	return yu.StreamDocsIn(bytes.NewBuffer(output))
 }
 
 func (hc *HelmChartDeployment) DefaultValues() (root *yaml.Node, err error) {

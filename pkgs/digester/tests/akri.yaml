@@ -1,0 +1,13 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: akri
+  namespace: akri
+spec:
+  repo: https://project-akri.github.io/akri/
+  chart: akri
+  version: 0.13.8
+  targetNamespace: akri
+  set:
+    udev.discovery.enabled: "true"
+    kubernetesDistro: "k3s"

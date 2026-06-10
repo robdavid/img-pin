@@ -166,6 +166,15 @@ func NewVerificationDigester(d *Digester) *Digester {
 	return &v
 }
 
+func NewSubDigester(d *Digester) *Digester {
+	v := Digester{}
+	v.options = d.options
+	v.skipped = d.skipped
+	v.Filename = d.Filename
+	v.imageDigester = d.imageDigester
+	return &v
+}
+
 func (ky *Digester) SkipOnPolicy(*images.Image) bool { return true }
 func (ky *Digester) SkipNoDigest(*images.Image) bool { return false }
 func (ky *Digester) SkipV1Schema(*images.Image) bool { return ky.options.skipV1Schema }
@@ -258,6 +267,14 @@ nextDoc:
 			yu.TrimMultiline(doc)
 		}
 		for _, reg := range registry {
+			if K8S_LIST.Match(doc) {
+				subD := NewSubDigester(ky)
+				listRes := DigesterResource{digester: subD}
+				Check(listRes.Load(doc))
+				ky.Resources[n] = listRes
+				log.Debug("{{.file}}: document {{.ndoc}} is a List")
+				continue nextDoc
+			}
 			if handler := reg.Handler.Match(doc, ky.imageDigester, ky); handler != nil {
 				Check(handler.Load(doc))
 				ky.Resources[n] = handler

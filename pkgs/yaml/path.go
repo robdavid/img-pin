@@ -236,23 +236,23 @@ type PathAndNode struct {
 	Node *yaml.Node
 }
 
-func collect(node *yaml.Node, path Path, wild bool, parent Path) (matches []PathAndNode) {
+func collect(node *yaml.Node, path Path, wild bool, internal bool, parent Path) (matches []PathAndNode) {
 
 	if len(path) == 0 {
-		if len(node.Content) == 0 {
+		if internal || len(node.Content) == 0 {
 			matches = slices.New(PathAndNode{slices.Clone(parent), node})
 		}
 		return
 	}
 
 	if path[0].IsMultiMatchAll() {
-		return collect(node, path[1:], true, parent)
+		return collect(node, path[1:], true, internal, parent)
 	}
 
 	switch node.Kind {
 	case yaml.DocumentNode:
 		for _, child := range node.Content {
-			matches = append(matches, collect(child, path, wild, parent)...)
+			matches = append(matches, collect(child, path, wild, internal, parent)...)
 		}
 	case yaml.MappingNode:
 		pe := path[0]
@@ -260,12 +260,12 @@ func collect(node *yaml.Node, path Path, wild bool, parent Path) (matches []Path
 			var newMatches []PathAndNode
 			matchPe, ok := pe.MatchKey(node.Content[i]).GetOK()
 			if ok {
-				newMatches = collect(node.Content[i+1], path[1:], false, append(parent, matchPe))
+				newMatches = collect(node.Content[i+1], path[1:], false, internal, append(parent, matchPe))
 			}
 			if wild && newMatches == nil {
 				var key string
 				if node.Content[i].Decode(&key) == nil {
-					newMatches = collect(node.Content[i+1], path, true, append(parent, Pe(key)))
+					newMatches = collect(node.Content[i+1], path, true, internal, append(parent, Pe(key)))
 				}
 			}
 			matches = append(matches, newMatches...)
@@ -274,23 +274,34 @@ func collect(node *yaml.Node, path Path, wild bool, parent Path) (matches []Path
 		pe := path[0]
 		for i, node := range node.Content {
 			if matchPe, ok := pe.MatchIndex(i).GetOK(); ok {
-				matches = append(matches, collect(node, path[1:], false, append(parent, matchPe))...)
+				matches = append(matches, collect(node, path[1:], false, internal, append(parent, matchPe))...)
 			} else if wild {
-				matches = append(matches, collect(node, path, true, append(parent, Pe(i)))...)
+				matches = append(matches, collect(node, path, true, internal, append(parent, Pe(i)))...)
 			}
 		}
 	case yaml.AliasNode:
-		return collect(node.Alias, path, wild, parent)
+		return collect(node.Alias, path, wild, internal, parent)
 	}
 	return
 }
 
 // MatchOne returns a single path that matches the one given. If there is no match,
-// a nil node is return with a false boolean. If there is one match, it is returned
+// a nil node is returned with a false boolean. If there is one match, it is returned
 // along with a true boolean. If there is more than one, the first is returned with
 // a false boolean.
 func MatchOne(node *yaml.Node, path Path) (*yaml.Node, bool) {
-	matches := collect(node, path, false, nil)
+	matches := collect(node, path, false, false, nil)
+	if len(matches) > 0 {
+		return matches[0].Node, len(matches) == 1
+	} else {
+		return nil, false
+	}
+}
+
+// MatchOneNode is like [MatchOne] except that it will match internal nodes as well as
+// leaf (scalar) nodes
+func MatchOneNode(node *yaml.Node, path Path) (*yaml.Node, bool) {
+	matches := collect(node, path, false, true, nil)
 	if len(matches) > 0 {
 		return matches[0].Node, len(matches) == 1
 	} else {
@@ -319,6 +330,19 @@ func GetPath[T Scalar](root *yaml.Node, path Path) opt.Val[T] {
 			return opt.Value(result)
 		}
 	}
+}
+
+func GetNodePath(root *yaml.Node, path Path) opt.Ref[yaml.Node] {
+	node, ok := MatchOneNode(root, path)
+	if !ok {
+		return opt.EmptyRef[yaml.Node]()
+	} else {
+		return opt.Reference(node)
+	}
+}
+
+func GetNode(root *yaml.Node, path ...any) opt.Ref[yaml.Node] {
+	return GetNodePath(root, MkPath(path))
 }
 
 type PathValue[T Scalar] struct {
@@ -354,12 +378,12 @@ func (pv PathValue[T]) IsEmpty() bool {
 
 // MatchMany returns all the [yaml.Node]s that reside at a path matching path, relative to node
 func MatchMany(node *yaml.Node, path Path) []*yaml.Node {
-	return slices.Map(collect(node, path, false, nil),
+	return slices.Map(collect(node, path, false, false, nil),
 		func(vp PathAndNode) *yaml.Node { return vp.Node })
 }
 
 func MatchManyWithNode(node *yaml.Node, path Path) []PathAndNode {
-	return collect(node, path, false, nil)
+	return collect(node, path, false, false, nil)
 }
 
 // EntryGroup groups PathAndNode entries that share a common prefix (parent path).
