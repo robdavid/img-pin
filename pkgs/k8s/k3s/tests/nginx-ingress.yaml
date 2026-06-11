@@ -1,0 +1,14 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: nginx-ingress
+  namespace: kube-system
+spec:
+  chart: ../../k8s/tests/charts/nginx-ingress
+  version: 1.1.0
+  targetNamespace: kube-system
+  set:
+    "controller.service.httpPort.port": 8080
+    "controller.service.httpsPort.port": 8443
+
+

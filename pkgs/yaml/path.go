@@ -17,6 +17,7 @@ import (
 var ErrUnknownPE = errors.New("Unknown path element content")
 var ErrBadType = errors.New("bad type")
 var ErrWriteFailed = errors.New("failed to verify write")
+var ErrParse = errors.New("cannot parse path")
 
 type PathElement struct {
 	index      opt.Val[int]
@@ -160,6 +161,67 @@ func (pe *PathElement) MatchIndex(nodeIndex int) opt.Opt[PathElement] {
 }
 
 type Path []PathElement
+
+func ParsePath(pathStr string) (Path, error) {
+	var p []byte
+	var quoted bool
+	var bracketed bool
+	var path []PathElement
+	errMesg := fmt.Errorf("%q: %w", pathStr, ErrParse)
+	for i := range len(pathStr) {
+		ch := pathStr[i]
+		if quoted {
+			if ch == '"' {
+				quoted = false
+			} else {
+				p = append(p, ch)
+			}
+		} else {
+			switch ch {
+			case '.':
+				if bracketed {
+					return nil, errMesg
+				}
+				path = append(path, PathElement{key: opt.Value(string(p))})
+				p = p[:0]
+			case '[':
+				if bracketed {
+					return nil, errMesg
+				}
+				if len(p) > 0 {
+					path = append(path, PathElement{key: opt.Value(string(p))})
+					p = p[:0]
+				}
+				bracketed = true
+			case ']':
+				if !bracketed {
+					return nil, errMesg
+				}
+				index, err := strconv.Atoi(string(p))
+				if err != nil {
+					return nil, fmt.Errorf("%w (%q: %w)", errMesg, p, err)
+				}
+				path = append(path, PathElement{index: opt.Value(index)})
+				bracketed = false
+				p = p[:0]
+			case '"':
+				if bracketed {
+					return nil, errMesg
+				}
+				quoted = true
+			default:
+				p = append(p, ch)
+			}
+		}
+	}
+	if quoted || bracketed {
+		return nil, errMesg
+	}
+	if len(p) > 0 {
+		path = append(path, PathElement{key: opt.Value(string(p))})
+	}
+	return path, nil
+}
 
 func (p Path) String() string {
 	var out strings.Builder
@@ -363,7 +425,7 @@ func ReadPathValue[T Scalar](root *yaml.Node, path Path) PathValue[T] {
 }
 
 func (pv PathValue[T]) WriteInto(root *yaml.Node) error {
-	return WriteNode(root, pv.Path, pv.Value)
+	return WriteValue(root, pv.Path, pv.Value)
 }
 
 func (pv PathValue[T]) IsNil() bool { return pv.Path == nil }
@@ -432,7 +494,7 @@ func verifyPut[T Scalar](root *yaml.Node, value T, path Path) error {
 
 func Put[T Scalar](root *yaml.Node, value T, path ...any) error {
 	p := MkPath(path)
-	if err := WriteNode(root, p, value); err != nil {
+	if err := WriteValue(root, p, value); err != nil {
 		return err
 	}
 	return verifyPut(root, value, p)
@@ -440,7 +502,7 @@ func Put[T Scalar](root *yaml.Node, value T, path ...any) error {
 }
 
 func PutPath[T Scalar](root *yaml.Node, value T, path Path) error {
-	if err := WriteNode(root, path, value); err != nil {
+	if err := WriteValue(root, path, value); err != nil {
 		return err
 	}
 	return verifyPut(root, value, path)
@@ -451,11 +513,22 @@ var (
 	ErrWriteCollision = errors.New("write path collision")
 )
 
-// WriteNode writes a scalar value into a yaml AST tree at the location
+// WriteValue writes a scalar value into a yaml AST tree at the location
 // specified by path, relative to root. Intermediate mapping and sequence nodes
 // are created as needed. Returns ErrWriteCollision if an existing node of the
 // wrong type occupies any position along the path.
-func WriteNode(root *yaml.Node, path Path, value any) error {
+func WriteValue(root *yaml.Node, path Path, value any) error {
+	var scalar yaml.Node
+	if err := scalar.Encode(value); err != nil {
+		return err
+	}
+	if scalar.Kind != yaml.ScalarNode {
+		return fmt.Errorf("%w: value must be a scalar, got %s", ErrWritePath, nodeKind(scalar.Kind))
+	}
+	return WriteNode(root, path, &scalar)
+}
+
+func WriteNode(root *yaml.Node, path Path, newNode *yaml.Node) error {
 	if root == nil {
 		return fmt.Errorf("%w: root node is nil", ErrWritePath)
 	}
@@ -476,7 +549,7 @@ func WriteNode(root *yaml.Node, path Path, value any) error {
 		}
 		isLast := i == len(path)-1
 		if isLast {
-			if err := setLeaf(node, pe, value); err != nil {
+			if err := setNode(node, pe, newNode); err != nil {
 				return err
 			}
 		} else {
@@ -543,14 +616,7 @@ func updateScalarMetadata(scalar *yaml.Node, reference *yaml.Node) {
 
 // setLeaf writes a scalar value into the child of parent identified by pe,
 // creating the child or updating an existing scalar as needed.
-func setLeaf(parent *yaml.Node, pe PathElement, value any) error {
-	var scalar yaml.Node
-	if err := scalar.Encode(value); err != nil {
-		return err
-	}
-	if scalar.Kind != yaml.ScalarNode {
-		return fmt.Errorf("%w: value must be a scalar, got %s", ErrWritePath, nodeKind(scalar.Kind))
-	}
+func setNode(parent *yaml.Node, pe PathElement, newNode *yaml.Node) error {
 	if idx, ok := pe.index.GetOK(); ok {
 		if parent.Kind != yaml.SequenceNode {
 			return fmt.Errorf("%w: expected sequence node for index access but got %s", ErrWriteCollision, nodeKind(parent.Kind))
@@ -562,8 +628,8 @@ func setLeaf(parent *yaml.Node, pe PathElement, value any) error {
 		if existing.Kind != yaml.ScalarNode {
 			return fmt.Errorf("%w: expected scalar at path index %d but found %s", ErrWriteCollision, idx, nodeKind(existing.Kind))
 		}
-		updateScalarMetadata(&scalar, existing)
-		*existing = scalar
+		updateScalarMetadata(newNode, existing)
+		*existing = *newNode
 		return nil
 	}
 	if key, ok := pe.key.GetOK(); ok {
@@ -576,13 +642,13 @@ func setLeaf(parent *yaml.Node, pe PathElement, value any) error {
 				if existing.Kind != yaml.ScalarNode {
 					return fmt.Errorf("%w: expected scalar at path key %q but found %s", ErrWriteCollision, key, nodeKind(existing.Kind))
 				}
-				updateScalarMetadata(&scalar, existing)
-				*existing = scalar
+				updateScalarMetadata(newNode, existing)
+				*existing = *newNode
 				return nil
 			}
 		}
 		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
-		parent.Content = append(parent.Content, keyNode, &scalar)
+		parent.Content = append(parent.Content, keyNode, newNode)
 		return nil
 	}
 	return fmt.Errorf("%w: path element %q has no key or index", ErrWritePath, pe.String())

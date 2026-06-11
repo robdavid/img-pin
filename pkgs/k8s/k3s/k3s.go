@@ -39,6 +39,7 @@ type HelmChartDeployment struct {
 	resource    *yaml.Node
 }
 
+// Load loads spec data from a HelmChart node
 func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 	hc.options = types.HelmOptions{
 		ChartName:  yu.Get[string](doc, "spec", "chart").GetOr(""),
@@ -53,13 +54,34 @@ func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 
 	var valuesNode yaml.Node
 	var values string
-	values = yu.Get[string](doc, "spec", "valuesContent").GetOr("")
+	values = yu.Get[string](doc, "spec", "valuesContent").GetOr("{}")
 	Check(yaml.Unmarshal([]byte(values), &valuesNode))
 	hc.values = &valuesNode
+	Check(hc.processSet(doc))
 	hc.resource = doc
 	return nil
 }
 
+func (hc *HelmChartDeployment) processSet(doc *yaml.Node) (err error) {
+	if node, ok := yu.GetNode(doc, "spec", "set").GetOK(); ok {
+		if node.Kind == yaml.MappingNode {
+			for i := 0; i+1 < len(node.Content); i += 2 {
+				var path yu.Path
+				if path, err = yu.ParsePath(node.Content[i].Value); err != nil {
+					return
+				}
+				if err = yu.WriteNode(hc.values, path, node.Content[i+1]); err != nil {
+					return fmt.Errorf("%q: %w", path, err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Render returns the resources, as YAML nodes, from the Helm chart template of
+// this HelmChart resource, applying the values and parameters defined in the
+// resource.
 func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	defer Catch(&err)
 	if hc.options.ChartName == "" {
