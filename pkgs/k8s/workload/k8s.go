@@ -35,6 +35,7 @@ func (k8s *K8SResource) Verify() error {
 func (k8s *K8SResource) Cleanup() error                { return nil }
 func (k8s *K8SResource) CanDigest() bool               { return true }
 func (k8s *K8SResource) Expand() ([]*yaml.Node, error) { return []*yaml.Node{k8s.resource}, nil }
+func (k8s *K8SResource) CRDs() ([]*yaml.Node, error)   { return nil, nil }
 
 type K8SWorkloadHandler struct{}
 

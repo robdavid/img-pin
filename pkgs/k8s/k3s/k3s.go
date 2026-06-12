@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -29,6 +32,35 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 		{Path: []any{"kind"}, Re: regexp.MustCompile(`^HelmChart$`)},
 		{Path: []any{"metadata", "name"}},
 	},
+}
+
+type ChartName struct {
+	Chart string
+	Base  string
+	Dir   string
+}
+
+func ParseChartName(chart string) (chartName ChartName) {
+	if strings.Contains(chart, "/") {
+		if u, err := url.Parse(chart); err == nil {
+			if (u.Scheme == "file" || u.Scheme == "") && u.Host == "" {
+				chartName.Dir = u.Path
+				chartName.Base = path.Base(u.Path)
+				chartName.Chart = u.Path
+			} else {
+				chartName.Chart = chart
+				chartName.Base = path.Base(u.Path)
+			}
+		} else {
+			chartName.Dir = chart
+			chartName.Base = path.Base(chart)
+			chartName.Chart = chart
+		}
+	} else {
+		chartName.Chart = chart
+		chartName.Base = chart
+	}
+	return
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
@@ -129,6 +161,49 @@ func (hc *HelmChartDeployment) DefaultValues() (root *yaml.Node, err error) {
 	var yamlRoot yaml.Node
 	err = yaml.Unmarshal(valueData, &yamlRoot)
 	root = &yamlRoot
+	return
+}
+
+func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
+	defer Catch(&err)
+	if hc.options.ChartName == "" {
+		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
+		return
+	}
+	chartName := ParseChartName(hc.options.ChartName)
+	if chartName.Dir != "" {
+		docs = hc.readCrds(chartName.Dir)
+		return
+	}
+	tmpDir := Try(os.MkdirTemp("", "tmp-img-pin-helm-*"))
+	defer os.RemoveAll(tmpDir)
+	helmCommand := []string{"helm", "fetch", "--untar", "--untardir", tmpDir, chartName.Chart}
+	if hc.options.Version != "" {
+		helmCommand = append(helmCommand, "--version", hc.options.Version)
+	}
+	if hc.options.Repository != "" {
+		helmCommand = append(helmCommand, "--repo", hc.options.Repository)
+	}
+	docs = hc.readCrds(filepath.Join(tmpDir, chartName.Base))
+	return
+}
+
+func (hc *HelmChartDeployment) readCrds(helmDir string) (docs []*yaml.Node) {
+	entries := Try(os.ReadDir(helmDir))
+	for _, entry := range entries {
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext == ".yaml" || ext == ".yml" {
+			fname := filepath.Join(helmDir, entry.Name())
+			func() {
+				fh := Try(os.Open(fname))
+				defer fh.Close()
+				var doc yaml.Node
+				decoder := yaml.NewDecoder(fh)
+				Check(decoder.Decode(&doc))
+				docs = append(docs, &doc)
+			}()
+		}
+	}
 	return
 }
 

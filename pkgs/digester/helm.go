@@ -313,6 +313,10 @@ func (hp *HelmProcessor) Expand() (docs []*yaml.Node, err error) {
 	return
 }
 
+func (hp *HelmProcessor) CRDs() ([]*yaml.Node, error) {
+	return hp.Deployment.CRDs()
+}
+
 func SetResourceNamespace(doc *yaml.Node, namespace string) (err error) {
 	defer Catch(&err)
 	if kind, ok := yu.Get[string](doc, "kind").GetOK(); ok {
