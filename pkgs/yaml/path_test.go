@@ -25,6 +25,84 @@ func TestPathStringEscaping(t *testing.T) {
 	assert.Equal(t, `top."middle.earth"[1]."[orcs]"[2].bottom`, p.String())
 }
 
+func TestPathParse(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		path, err := yaml.ParsePath("")
+		assert.NoError(t, err)
+		assert.Empty(t, path)
+	})
+
+	t.Run("one element", func(t *testing.T) {
+		path, err := yaml.ParsePath("one")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf("one"), path)
+	})
+
+	t.Run("multiple elements", func(t *testing.T) {
+		path, err := yaml.ParsePath("one.two.three")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf("one", "two", "three"), path)
+	})
+
+	t.Run("one index", func(t *testing.T) {
+		path, err := yaml.ParsePath("[0]")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf(0), path)
+	})
+
+	t.Run("two indices", func(t *testing.T) {
+		path, err := yaml.ParsePath("[0][1]")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf(0, 1), path)
+	})
+
+	t.Run("property and index", func(t *testing.T) {
+		path, err := yaml.ParsePath("one[2]")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf("one", 2), path)
+	})
+
+	t.Run("property and index with dot", func(t *testing.T) {
+		path, err := yaml.ParsePath("one.[2]")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf("one", 2), path)
+	})
+
+	t.Run("quoted property", func(t *testing.T) {
+		path, err := yaml.ParsePath("\"one.two.three\"")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf("one.two.three"), path)
+	})
+
+	t.Run("quoted and unquoted property", func(t *testing.T) {
+		path, err := yaml.ParsePath("\"one.two.three\".four[5]")
+		assert.NoError(t, err)
+		assert.Equal(t, yaml.PathOf("one.two.three", "four", 5), path)
+	})
+
+	t.Run("bad index", func(t *testing.T) {
+		path, err := yaml.ParsePath("fish[chips]")
+		assert.Error(t, err)
+		assert.Nil(t, path)
+		assert.ErrorContains(t, err, "\"fish[chips]\": cannot parse path")
+	})
+
+	t.Run("unbalanced bracket", func(t *testing.T) {
+		path, err := yaml.ParsePath("fish[6")
+		assert.Error(t, err)
+		assert.Nil(t, path)
+		assert.ErrorContains(t, err, "\"fish[6\": cannot parse path")
+	})
+
+	t.Run("unclosed quote", func(t *testing.T) {
+		path, err := yaml.ParsePath("\"fish[6]")
+		assert.Error(t, err)
+		assert.Nil(t, path)
+		assert.ErrorContains(t, err, "\"\\\"fish[6]\": cannot parse path")
+	})
+
+}
+
 func readTestFile(file string) []byte {
 	return Try(os.ReadFile(filepath.Join("tests", file)))
 }
@@ -258,14 +336,14 @@ func TestPathSort(t *testing.T) {
 	assert.Equal([]any{"a", "c", "d"}, paths[3].Objects())
 }
 
-func TestWriteNode(t *testing.T) {
+func TestWriteValue(t *testing.T) {
 	defer test.ReportErr(t)
 
 	t.Run("new key in mapping", func(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("{}\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("a"), 1))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("a"), 1))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a"))
 		assert.True(ok)
@@ -278,7 +356,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a: 1\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("a"), 2))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("a"), 2))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a"))
 		assert.True(ok)
@@ -291,7 +369,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("[10]\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf(1), 20))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf(1), 20))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf(0))
 		assert.True(ok)
@@ -309,7 +387,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("[1, 2, 3]\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf(1), 5))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf(1), 5))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf(1))
 		assert.True(ok)
@@ -322,7 +400,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("{}\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("a", "b"), 1))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("a", "b"), 1))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a", "b"))
 		assert.True(ok)
@@ -335,7 +413,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("{}\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("a", 0), "x"))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("a", 0), "x"))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a", 0))
 		assert.True(ok)
@@ -348,7 +426,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("{}\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("a", "b", "c"), 42))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("a", "b", "c"), 42))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a", "b", "c"))
 		assert.True(ok)
@@ -370,7 +448,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a:\n  b: 1\n"), &doc))
-		err := yaml.WriteNode(&doc, yaml.PathOf("a"), 2)
+		err := yaml.WriteValue(&doc, yaml.PathOf("a"), 2)
 		assert.Error(err)
 		assert.ErrorIs(err, yaml.ErrWriteCollision)
 	})
@@ -379,7 +457,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a: 1\n"), &doc))
-		err := yaml.WriteNode(&doc, yaml.PathOf("a", "b"), 2)
+		err := yaml.WriteValue(&doc, yaml.PathOf("a", "b"), 2)
 		assert.Error(err)
 		assert.ErrorIs(err, yaml.ErrWriteCollision)
 	})
@@ -389,7 +467,7 @@ func TestWriteNode(t *testing.T) {
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a:\n  - 1\n"), &doc))
 		// "a" holds a sequence but path expects a mapping (since next is key "b")
-		err := yaml.WriteNode(&doc, yaml.PathOf("a", "b"), 1)
+		err := yaml.WriteValue(&doc, yaml.PathOf("a", "b"), 1)
 		assert.Error(err)
 		assert.ErrorIs(err, yaml.ErrWriteCollision)
 	})
@@ -399,7 +477,7 @@ func TestWriteNode(t *testing.T) {
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a:\n  - x\n"), &doc))
 		// Element at a[0] is scalar but path expects a mapping (since next is key "b")
-		err := yaml.WriteNode(&doc, yaml.PathOf("a", 0, "b"), 1)
+		err := yaml.WriteValue(&doc, yaml.PathOf("a", 0, "b"), 1)
 		assert.Error(err)
 		assert.ErrorIs(err, yaml.ErrWriteCollision)
 	})
@@ -408,11 +486,11 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("{}\n"), &doc))
-		err := yaml.WriteNode(&doc, yaml.PathOf("*"), 1)
+		err := yaml.WriteValue(&doc, yaml.PathOf("*"), 1)
 		assert.Error(err)
 		assert.ErrorIs(err, yaml.ErrWritePath)
 
-		err = yaml.WriteNode(&doc, yaml.PathOf("**"), 1)
+		err = yaml.WriteValue(&doc, yaml.PathOf("**"), 1)
 		assert.Error(err)
 		assert.ErrorIs(err, yaml.ErrWritePath)
 	})
@@ -421,7 +499,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a: old\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("a"), "new"))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("a"), "new"))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a"))
 		assert.True(ok)
@@ -434,7 +512,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("{}\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("enabled"), true))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("enabled"), true))
 
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("enabled"))
 		assert.True(ok)
@@ -447,7 +525,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("[]\n"), &doc))
-		Check(yaml.WriteNode(&doc, yaml.PathOf(0, 0), 42))
+		Check(yaml.WriteValue(&doc, yaml.PathOf(0, 0), 42))
 		var val [][]int
 		Check(doc.Decode(&val))
 		assert.Equal([][]int{{42}}, val)
@@ -457,7 +535,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("a: &anchor\n  x: 1\nb: *anchor\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("b", "x"), 99))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("b", "x"), 99))
 
 		// Both paths see the update since they share the anchor
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("a", "x"))
@@ -476,7 +554,7 @@ func TestWriteNode(t *testing.T) {
 		assert := assert.New(t)
 		var doc yamlv3.Node
 		Check(yamlv3.Unmarshal([]byte("greeting: &val hello\nalias: *val\n"), &doc))
-		assert.Nil(yaml.WriteNode(&doc, yaml.PathOf("alias"), "world"))
+		assert.Nil(yaml.WriteValue(&doc, yaml.PathOf("alias"), "world"))
 
 		// Both paths see the update since they share the anchor
 		result, ok := yaml.MatchOne(&doc, yaml.PathOf("greeting"))
@@ -489,5 +567,28 @@ func TestWriteNode(t *testing.T) {
 		assert.True(ok)
 		Check(result.Decode(&val))
 		assert.Equal("world", val)
+	})
+}
+
+func TestWriteNode(t *testing.T) {
+	defer test.ReportErr(t)
+
+	t.Run("add subtree", func(t *testing.T) {
+		t1 := "{a: 1}"
+		t2 := "{c: 3, d: 4}"
+		var t1d, t2d yamlv3.Node
+		Check(yamlv3.Unmarshal([]byte(t1), &t1d))
+		Check(yamlv3.Unmarshal([]byte(t2), &t2d))
+		Check(yaml.WriteNode(&t1d, yaml.PathOf("b"), &t2d))
+		var tmap map[string]any
+		Check(t1d.Decode(&tmap))
+		expected := map[string]any{
+			"a": 1,
+			"b": map[string]any{
+				"c": 3,
+				"d": 4,
+			},
+		}
+		assert.Equal(t, expected, tmap)
 	})
 }

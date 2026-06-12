@@ -97,3 +97,30 @@ func TestHelmUpdate(t *testing.T) {
 	Check(helmProc.Digest())
 	deployment.Save()
 }
+
+func TestValueSet(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	require := require.New(t)
+	docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
+	require.Equal(1, len(docs))
+	deployment := k3s.HelmChartDeployment{}
+	deployment.Load(docs[0])
+	helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
+	Check(helmProc.Digest())
+	Try(deployment.Save())
+	resources := Try(deployment.Render())
+	for _, resource := range resources {
+		if kind, ok := yu.Get[string](resource, "kind").GetOK(); ok && kind == "Service" {
+			type obj = map[string]any
+			type lst = []any
+			var service obj
+			Check(resource.Decode(&service))
+			port0 := service["spec"].(obj)["ports"].(lst)[0].(obj)["port"]
+			port1 := service["spec"].(obj)["ports"].(lst)[1].(obj)["port"]
+			assert.Equal(8080, port0)
+			assert.Equal(8443, port1)
+			break
+		}
+	}
+}
