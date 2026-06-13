@@ -500,6 +500,19 @@ func DigestKube(filename string, options ...Option) (digester *Digester, err err
 	return
 }
 
+func FetchCrds(filename string, options ...Option) (crds []*yaml.Node, err error) {
+	defer Handle(func(e error) {
+		err = fmt.Errorf("%s: %w", filename, e)
+	})
+	slog := slog.With("file", filename)
+	digester := NewDigester(options...)
+	defer digester.Cleanup()
+	Check(digester.LoadFile(filename))
+	crds = Try(digester.CRDs())
+	slog.Debug("{{.file}}: {{.ndoc}} crds", "ndoc", len(crds))
+	return
+}
+
 func WriteCombinedDigests(digests []*Digester, output io.Writer) (err error) {
 	defer Catch(&err)
 	totalLen := slices.Fold(digests, 0, func(total int, digest *Digester) int { return total + len(digest.Resources) })

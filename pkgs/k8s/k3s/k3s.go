@@ -184,16 +184,27 @@ func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 	if hc.options.Repository != "" {
 		helmCommand = append(helmCommand, "--repo", hc.options.Repository)
 	}
+	if _, err = run.Run(helmCommand...); err != nil {
+		return
+	}
 	docs = hc.readCrds(filepath.Join(tmpDir, chartName.Base))
 	return
 }
 
 func (hc *HelmChartDeployment) readCrds(helmDir string) (docs []*yaml.Node) {
-	entries := Try(os.ReadDir(helmDir))
+	crdsDir := filepath.Join(helmDir, "crds")
+	if _, err := os.Stat(crdsDir); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil
+		} else {
+			Raise(err)
+		}
+	}
+	entries := Try(os.ReadDir(crdsDir))
 	for _, entry := range entries {
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
 		if ext == ".yaml" || ext == ".yml" {
-			fname := filepath.Join(helmDir, entry.Name())
+			fname := filepath.Join(crdsDir, entry.Name())
 			func() {
 				fh := Try(os.Open(fname))
 				defer fh.Close()

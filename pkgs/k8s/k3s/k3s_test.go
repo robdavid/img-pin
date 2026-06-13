@@ -125,6 +125,22 @@ func TestValueSet(t *testing.T) {
 	}
 }
 
+func TestCrds(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	require := require.New(t)
+	docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
+	require.Equal(1, len(docs))
+	deployment := k3s.HelmChartDeployment{}
+	deployment.Load(docs[0])
+	helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
+	crds := Try(helmProc.CRDs())
+	assert.Equal(12, len(crds))
+	for i, crd := range crds {
+		assert.Equal("CustomResourceDefinition", yu.Get[string](crd, "kind").GetOr(""), "doc %n is not a CRD", i)
+	}
+}
+
 func TestParseChartName(t *testing.T) {
 	t.Run("bare name", func(t *testing.T) {
 		assert := assert.New(t)
