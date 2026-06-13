@@ -194,7 +194,7 @@ func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 func (hc *HelmChartDeployment) readCrds(helmDir string) (docs []*yaml.Node) {
 	crdsDir := filepath.Join(helmDir, "crds")
 	if _, err := os.Stat(crdsDir); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		} else {
 			Raise(err)
