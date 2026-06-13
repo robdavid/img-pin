@@ -80,3 +80,7 @@ func (dr DigesterResource) Expand() ([]*yaml.Node, error) {
 		return []*yaml.Node{node}, nil
 	}
 }
+
+func (dr DigesterResource) CRDs() ([]*yaml.Node, error) {
+	return dr.digester.CRDs()
+}

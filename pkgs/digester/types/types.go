@@ -43,6 +43,8 @@ type Resource interface {
 	Verify() error
 
 	Expand() ([]*yaml.Node, error)
+
+	CRDs() ([]*yaml.Node, error)
 }
 
 // HelmOptions holds basic deployment options
@@ -73,4 +75,7 @@ type Deployment interface {
 
 	// Options returns the options required for the deployment
 	Options() *HelmOptions
+
+	// CRDs returns crd documents as YAML nodes.
+	CRDs() ([]*yaml.Node, error)
 }

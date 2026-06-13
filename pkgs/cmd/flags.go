@@ -19,6 +19,7 @@ type UserOpts struct {
 	Yamlfiles      bool
 	Dockerfiles    bool
 	KubeExpand     bool
+	DumpCrds       bool
 	SkipAuth       bool
 	SkipPostVerify bool
 	SkipNotFound   bool
@@ -48,6 +49,7 @@ func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
 	flag.BoolVarP(&opts.Help, "help", "h", false, "Display this help message")
 	flag.BoolVarP(&opts.BatchMode, "batch", "b", false, "Batch mode; don't stop processing files if there's an error")
 	flag.BoolVarP(&opts.CountRequests, "counters", "c", false, "Count registry requests and print a summary at the end")
+	flag.BoolVarP(&opts.DumpCrds, "crds", "C", false, "Dump any custom resource definitions defined in any Helm charts")
 	flag.BoolVarP(&opts.Dockerfiles, "dockerfile", "d", false, "Process arguments as Dockerfile path names, patching in place as required")
 	flag.StringVar(&opts.FileDesc, "file-source", "", "A descriptive file source to print in messages")
 	flag.BoolVarP(&opts.Image, "image", "i", false, "arguments are image names to determine the hashes of")

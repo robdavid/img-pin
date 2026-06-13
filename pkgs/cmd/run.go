@@ -16,6 +16,9 @@ import (
 	"github.com/robdavid/img-pin/pkgs/dockerfile"
 	"github.com/robdavid/img-pin/pkgs/ferrors"
 	"github.com/robdavid/img-pin/pkgs/images"
+	yu "github.com/robdavid/img-pin/pkgs/yaml"
+
+	"gopkg.in/yaml.v3"
 )
 
 var ErrNoAction = errors.New("no action provided")
@@ -84,17 +87,19 @@ func CreateDigestOptions(opts *UserOpts) (imageOptions []images.ImageOption, dig
 
 func Run(opts *UserOpts, args []string) (requestCounters images.RequestCounters, err error) {
 	ConfigureLogging(opts)
-	if !(opts.Yamlfiles || opts.Dockerfiles || opts.Image || opts.KubeExpand) {
-		return nil, fmt.Errorf("%w: please supply one of --yaml, --dockerfile, or --image", ErrNoAction)
+	if !(opts.Yamlfiles || opts.Dockerfiles || opts.Image || opts.KubeExpand || opts.DumpCrds) {
+		return nil, fmt.Errorf("%w: please supply one of --yaml, --dockerfile, --kube, --crds or --image", ErrNoAction)
 	}
 	if len(args) == 0 {
 		return nil, ErrNoInputs
 	}
-	if opts.Yamlfiles || opts.KubeExpand {
+	if opts.Yamlfiles || opts.KubeExpand || opts.DumpCrds {
 		var digesterOptions []digester.Option
 		_, digesterOptions, requestCounters = CreateDigestOptions(opts)
 		noLocks := slices.Filter(args, func(name string) bool { return !strings.HasSuffix(name, ".lock.yaml") })
-		if opts.KubeExpand {
+		if opts.DumpCrds {
+			err = processCrdResources(noLocks, opts, digesterOptions)
+		} else if opts.KubeExpand {
 			err = processKubeResource(noLocks, opts, digesterOptions)
 		} else {
 			err = processYamlResources(noLocks, opts, digesterOptions)
@@ -156,6 +161,19 @@ func digestImages(args []string, imageOptions []images.ImageOption) (err error) 
 		fmt.Printf("%s %s\n", img, time.Since(created).Round(time.Second))
 	}
 
+	return
+}
+
+func processCrdResources(files []string, opts *UserOpts, digesterOptions []digester.Option) (err error) {
+	allCrds := make([]*yaml.Node, 0)
+	for _, file := range files {
+		var crds []*yaml.Node
+		if crds, err = digester.FetchCrds(file, digesterOptions...); err != nil {
+			return
+		}
+		allCrds = append(allCrds, crds...)
+	}
+	yu.StreamDocsOut(os.Stdout, allCrds...)
 	return
 }
 

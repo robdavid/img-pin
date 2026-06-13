@@ -58,6 +58,7 @@ func (*SimpleResource) CanDigest() bool                 { return false }
 func (*SimpleResource) Digest() error                   { panic("Digest called on SimpleResource - not supported") }
 func (*SimpleResource) Verify() error                   { panic("Verify called on SimpleResource - not supported") }
 func (r *SimpleResource) Expand() ([]*yaml.Node, error) { return []*yaml.Node{r.Node}, nil }
+func (*SimpleResource) CRDs() ([]*yaml.Node, error)     { return nil, nil }
 
 type Options struct {
 	updateMethod   types.UpdateMethod
@@ -334,6 +335,17 @@ func (ky *Digester) VerifyDigests() (err error) {
 	return
 }
 
+func (ky *Digester) CRDs() (crds []*yaml.Node, err error) {
+	for _, resource := range ky.Resources {
+		var docs []*yaml.Node
+		if docs, err = resource.CRDs(); err != nil {
+			return
+		}
+		crds = append(crds, docs...)
+	}
+	return
+}
+
 func (ky *Digester) WriteFile() (err error) {
 	defer Catch(&err)
 	if ky.Filename == "" {
@@ -485,6 +497,19 @@ func DigestKube(filename string, options ...Option) (digester *Digester, err err
 	slog.Debug("{{.file}}: {{.ndoc}} expanded documents", "ndoc", len(digester.Docs))
 	Check(digester.CreateDigests())
 	Check(digester.WriteAnyLocks())
+	return
+}
+
+func FetchCrds(filename string, options ...Option) (crds []*yaml.Node, err error) {
+	defer Handle(func(e error) {
+		err = fmt.Errorf("%s: %w", filename, e)
+	})
+	slog := slog.With("file", filename)
+	digester := NewDigester(options...)
+	defer digester.Cleanup()
+	Check(digester.LoadFile(filename))
+	crds = Try(digester.CRDs())
+	slog.Debug("{{.file}}: {{.ndoc}} crds", "ndoc", len(crds))
 	return
 }
 

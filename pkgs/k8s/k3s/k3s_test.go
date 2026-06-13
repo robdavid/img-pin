@@ -124,3 +124,66 @@ func TestValueSet(t *testing.T) {
 		}
 	}
 }
+
+func TestCrds(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	require := require.New(t)
+	docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
+	require.Equal(1, len(docs))
+	deployment := k3s.HelmChartDeployment{}
+	deployment.Load(docs[0])
+	helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
+	crds := Try(helmProc.CRDs())
+	assert.Equal(12, len(crds))
+	for i, crd := range crds {
+		assert.Equal("CustomResourceDefinition", yu.Get[string](crd, "kind").GetOr(""), "doc %n is not a CRD", i)
+	}
+}
+
+func TestParseChartName(t *testing.T) {
+	t.Run("bare name", func(t *testing.T) {
+		assert := assert.New(t)
+		cn := k3s.ParseChartName("harbor")
+		assert.Equal("", cn.Dir)
+		assert.Equal("harbor", cn.Base)
+		assert.Equal("harbor", cn.Chart)
+	})
+
+	t.Run("oci", func(t *testing.T) {
+		assert := assert.New(t)
+		const url = "oci://ghcr.io/nginxinc/charts/nginx-ingress"
+		cn := k3s.ParseChartName(url)
+		assert.Equal("", cn.Dir)
+		assert.Equal("nginx-ingress", cn.Base)
+		assert.Equal(url, cn.Chart)
+	})
+
+	t.Run("file url", func(t *testing.T) {
+		assert := assert.New(t)
+		const url = "file:///path/chart"
+		cn := k3s.ParseChartName(url)
+		assert.Equal("/path/chart", cn.Dir)
+		assert.Equal("chart", cn.Base)
+		assert.Equal("/path/chart", cn.Chart)
+	})
+
+	t.Run("just file", func(t *testing.T) {
+		assert := assert.New(t)
+		const path = "/path/chart"
+		cn := k3s.ParseChartName(path)
+		assert.Equal("/path/chart", cn.Dir)
+		assert.Equal("chart", cn.Base)
+		assert.Equal("/path/chart", cn.Chart)
+	})
+
+	t.Run("relative file", func(t *testing.T) {
+		assert := assert.New(t)
+		const path = "../path/chart"
+		cn := k3s.ParseChartName(path)
+		assert.Equal("../path/chart", cn.Dir)
+		assert.Equal("chart", cn.Base)
+		assert.Equal("../path/chart", cn.Chart)
+	})
+
+}
