@@ -320,7 +320,9 @@ func (hp *HelmProcessor) CRDs() ([]*yaml.Node, error) {
 func SetResourceNamespace(doc *yaml.Node, namespace string) (err error) {
 	defer Catch(&err)
 	if kind, ok := yu.Get[string](doc, "kind").GetOK(); ok {
-		Check(yu.Put(doc, namespace, "metadata", "namespace"))
+		if yu.Get[string](doc, "metadata", "namespace").IsEmpty() {
+			Check(yu.Put(doc, namespace, "metadata", "namespace"))
+		}
 		if kind == "List" {
 			if items, ok := yu.GetNode(doc, "items").GetOK(); ok {
 				for _, child := range items.Content {
