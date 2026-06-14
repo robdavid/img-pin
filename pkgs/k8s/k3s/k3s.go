@@ -74,10 +74,11 @@ type HelmChartDeployment struct {
 // Load loads spec data from a HelmChart node
 func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 	hc.options = types.HelmOptions{
-		ChartName:  yu.Get[string](doc, "spec", "chart").GetOr(""),
-		Repository: yu.Get[string](doc, "spec", "repo").GetOr(""),
-		Version:    yu.Get[string](doc, "spec", "version").GetOr(""),
-		Namespace:  yu.Get[string](doc, "spec", "targetNamespace").GetOr(""),
+		InstanceName: yu.Get[string](doc, "metadata", "name").GetOr(""),
+		ChartName:    yu.Get[string](doc, "spec", "chart").GetOr(""),
+		Repository:   yu.Get[string](doc, "spec", "repo").GetOr(""),
+		Version:      yu.Get[string](doc, "spec", "version").GetOr(""),
+		Namespace:    yu.Get[string](doc, "spec", "targetNamespace").GetOr(""),
 	}
 	hc.kubeVersion, _ = kube.GetClusterVersion()
 	slog.Debug("Loaded HelmChart Deployment, chart={{.chart}}, repository={{.repository}}, version={{.version}}, detected cluster={{.kubeVersion}}",
@@ -127,12 +128,15 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	Check(encoder.Encode(hc.values))
 	Check(encoder.Close())
 	fh.Close()
-	helmCommand := []string{"helm", "template", "verification", hc.options.ChartName, "--values", fh.Name()}
+	helmCommand := []string{"helm", "template", hc.options.InstanceName, hc.options.ChartName, "--values", fh.Name()}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}
 	if hc.options.Repository != "" {
 		helmCommand = append(helmCommand, "--repo", hc.options.Repository)
+	}
+	if hc.options.Namespace != "" {
+		helmCommand = append(helmCommand, "--namespace", hc.options.Namespace)
 	}
 	if hc.kubeVersion != "" {
 		helmCommand = append(helmCommand, "--dry-run=server")
