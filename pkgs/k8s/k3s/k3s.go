@@ -142,7 +142,7 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 		helmCommand = append(helmCommand, "--dry-run=server")
 	}
 	var output []byte
-	output, err = run.Run(helmCommand...)
+	output = Try(run.Run(helmCommand...))
 	return yu.StreamDocsIn(bytes.NewBuffer(output))
 }
 
