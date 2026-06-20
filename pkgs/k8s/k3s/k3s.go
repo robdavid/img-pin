@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -16,6 +14,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/skipping"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
+	"github.com/robdavid/img-pin/pkgs/k8s"
 	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
@@ -34,35 +33,6 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 	},
 }
 
-type ChartName struct {
-	Chart string
-	Base  string
-	Dir   string
-}
-
-func ParseChartName(chart string) (chartName ChartName) {
-	if strings.Contains(chart, "/") {
-		if u, err := url.Parse(chart); err == nil {
-			if (u.Scheme == "file" || u.Scheme == "") && u.Host == "" {
-				chartName.Dir = u.Path
-				chartName.Base = path.Base(u.Path)
-				chartName.Chart = u.Path
-			} else {
-				chartName.Chart = chart
-				chartName.Base = path.Base(u.Path)
-			}
-		} else {
-			chartName.Dir = chart
-			chartName.Base = path.Base(chart)
-			chartName.Chart = chart
-		}
-	} else {
-		chartName.Chart = chart
-		chartName.Base = chart
-	}
-	return
-}
-
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
 type HelmChartDeployment struct {
 	options     types.HelmOptions
@@ -74,10 +44,11 @@ type HelmChartDeployment struct {
 // Load loads spec data from a HelmChart node
 func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
 	hc.options = types.HelmOptions{
-		ChartName:  yu.Get[string](doc, "spec", "chart").GetOr(""),
-		Repository: yu.Get[string](doc, "spec", "repo").GetOr(""),
-		Version:    yu.Get[string](doc, "spec", "version").GetOr(""),
-		Namespace:  yu.Get[string](doc, "spec", "targetNamespace").GetOr(""),
+		InstanceName: yu.Get[string](doc, "metadata", "name").GetOr(""),
+		ChartName:    yu.Get[string](doc, "spec", "chart").GetOr(""),
+		Repository:   yu.Get[string](doc, "spec", "repo").GetOr(""),
+		Version:      yu.Get[string](doc, "spec", "version").GetOr(""),
+		Namespace:    yu.Get[string](doc, "spec", "targetNamespace").GetOr(""),
 	}
 	hc.kubeVersion, _ = kube.GetClusterVersion()
 	slog.Debug("Loaded HelmChart Deployment, chart={{.chart}}, repository={{.repository}}, version={{.version}}, detected cluster={{.kubeVersion}}",
@@ -127,18 +98,21 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	Check(encoder.Encode(hc.values))
 	Check(encoder.Close())
 	fh.Close()
-	helmCommand := []string{"helm", "template", "verification", hc.options.ChartName, "--values", fh.Name()}
+	helmCommand := []string{"helm", "template", hc.options.InstanceName, hc.options.ChartName, "--values", fh.Name()}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}
 	if hc.options.Repository != "" {
 		helmCommand = append(helmCommand, "--repo", hc.options.Repository)
 	}
+	if hc.options.Namespace != "" {
+		helmCommand = append(helmCommand, "--namespace", hc.options.Namespace)
+	}
 	if hc.kubeVersion != "" {
 		helmCommand = append(helmCommand, "--dry-run=server")
 	}
 	var output []byte
-	output, err = run.Run(helmCommand...)
+	output = Try(run.Run(helmCommand...))
 	return yu.StreamDocsIn(bytes.NewBuffer(output))
 }
 
@@ -170,7 +144,7 @@ func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
 		return
 	}
-	chartName := ParseChartName(hc.options.ChartName)
+	chartName := k8s.ParseChartName(hc.options.ChartName)
 	if chartName.Dir != "" {
 		docs = hc.readCrds(chartName.Dir)
 		return

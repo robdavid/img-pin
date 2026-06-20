@@ -206,10 +206,6 @@ func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption
 }
 
 func (lf *Lockfile) VerifyDigest(image *images.Image, options ...images.ImageOption) (err error) {
-	if _, err = images.ApplyPolicies(image, options...); err != nil {
-		// Fallback image should already be stored in lock file
-		return
-	}
 	imageKey := imageKey(image)
 	imageData := lf.Index[imageKey]
 	slog.Debug("lockfile lookup of {{.key}} gives {{.digest}}", "key", imageKey, "digest", imageData)

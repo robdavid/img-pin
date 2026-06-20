@@ -49,10 +49,11 @@ type Resource interface {
 
 // HelmOptions holds basic deployment options
 type HelmOptions struct {
-	ChartName  string
-	Repository string
-	Version    string
-	Namespace  string
+	ChartName    string
+	InstanceName string
+	Repository   string
+	Version      string
+	Namespace    string
 }
 
 type Deployment interface {
