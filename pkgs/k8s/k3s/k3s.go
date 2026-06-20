@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -16,6 +14,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/skipping"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
+	"github.com/robdavid/img-pin/pkgs/k8s"
 	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
@@ -32,35 +31,6 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 		{Path: []any{"kind"}, Re: regexp.MustCompile(`^HelmChart$`)},
 		{Path: []any{"metadata", "name"}},
 	},
-}
-
-type ChartName struct {
-	Chart string
-	Base  string
-	Dir   string
-}
-
-func ParseChartName(chart string) (chartName ChartName) {
-	if strings.Contains(chart, "/") {
-		if u, err := url.Parse(chart); err == nil {
-			if (u.Scheme == "file" || u.Scheme == "") && u.Host == "" {
-				chartName.Dir = u.Path
-				chartName.Base = path.Base(u.Path)
-				chartName.Chart = u.Path
-			} else {
-				chartName.Chart = chart
-				chartName.Base = path.Base(u.Path)
-			}
-		} else {
-			chartName.Dir = chart
-			chartName.Base = path.Base(chart)
-			chartName.Chart = chart
-		}
-	} else {
-		chartName.Chart = chart
-		chartName.Base = chart
-	}
-	return
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
@@ -174,7 +144,7 @@ func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
 		return
 	}
-	chartName := ParseChartName(hc.options.ChartName)
+	chartName := k8s.ParseChartName(hc.options.ChartName)
 	if chartName.Dir != "" {
 		docs = hc.readCrds(chartName.Dir)
 		return
