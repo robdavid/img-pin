@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
+	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/skipping"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
@@ -19,6 +20,10 @@ import (
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"gopkg.in/yaml.v3"
+)
+
+const (
+	DefaultHelmBinary = "helm"
 )
 
 var (
@@ -31,6 +36,28 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 		{Path: []any{"kind"}, Re: regexp.MustCompile(`^HelmChart$`)},
 		{Path: []any{"metadata", "name"}},
 	},
+}
+
+var (
+	envHelmBinary = "IMG_PIN_HELM"
+	helmBinary    opt.Val[string]
+)
+
+func SetHelmBinaryEnv(env string) {
+	envHelmBinary = env
+	helmBinary.Unset()
+}
+
+func HelmBinary() string {
+	if helm, ok := helmBinary.GetOK(); ok {
+		return helm
+	} else {
+		if helm = os.Getenv(envHelmBinary); helm == "" {
+			helm = DefaultHelmBinary
+		}
+		helmBinary.Set(helm)
+		return helm
+	}
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
@@ -98,7 +125,7 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	Check(encoder.Encode(hc.values))
 	Check(encoder.Close())
 	fh.Close()
-	helmCommand := []string{"helm", "template", hc.options.InstanceName, hc.options.ChartName, "--values", fh.Name()}
+	helmCommand := []string{HelmBinary(), "template", hc.options.InstanceName, hc.options.ChartName, "--values", fh.Name()}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}
@@ -121,7 +148,7 @@ func (hc *HelmChartDeployment) DefaultValues() (root *yaml.Node, err error) {
 		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
 		return
 	}
-	helmCommand := []string{"helm", "show", "values", hc.options.ChartName}
+	helmCommand := []string{HelmBinary(), "show", "values", hc.options.ChartName}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}
@@ -151,7 +178,7 @@ func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 	}
 	tmpDir := Try(os.MkdirTemp("", "tmp-img-pin-helm-*"))
 	defer os.RemoveAll(tmpDir)
-	helmCommand := []string{"helm", "fetch", "--untar", "--untardir", tmpDir, chartName.Chart}
+	helmCommand := []string{HelmBinary(), "fetch", "--untar", "--untardir", tmpDir, chartName.Chart}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}

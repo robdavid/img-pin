@@ -2,6 +2,7 @@ package k3s_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
@@ -139,4 +140,27 @@ func TestCrds(t *testing.T) {
 	for i, crd := range crds {
 		assert.Equal("CustomResourceDefinition", yu.Get[string](crd, "kind").GetOr(""), "doc %n is not a CRD", i)
 	}
+}
+
+func TestHelmBinary(t *testing.T) {
+
+	const envName = "IMG_PIN_HELM"
+
+	t.Run("with default binary", func(t *testing.T) {
+		k3s.SetHelmBinaryEnv(envName)
+		os.Unsetenv(envName)
+		for range 2 {
+			assert.Equal(t, "helm", k3s.HelmBinary())
+		}
+	})
+
+	t.Run("with specific binary", func(t *testing.T) {
+		k3s.SetHelmBinaryEnv(envName)
+		os.Setenv(envName, "helm4")
+		defer os.Unsetenv(envName)
+		for range 2 {
+			assert.Equal(t, "helm4", k3s.HelmBinary())
+		}
+	})
+
 }
