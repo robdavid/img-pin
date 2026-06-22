@@ -211,7 +211,8 @@ func (lf *Lockfile) VerifyDigest(image *images.Image, options ...images.ImageOpt
 	slog.Debug("lockfile lookup of {{.key}} gives {{.digest}}", "key", imageKey, "digest", imageData)
 	if imageData == nil {
 		err = fmt.Errorf("%q: %w", image, ErrImageNoLock)
-		return
+	} else if digest, ok := imageData.Digest.RefOK(); !ok || *image != *digest {
+		err = fmt.Errorf("%q: %w", image, images.ErrNoDigest)
 	}
-	return nil
+	return
 }

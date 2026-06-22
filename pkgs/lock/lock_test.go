@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/test"
+	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/images"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +29,18 @@ const testLockYaml = `images:
     digest: sha256:deadbeef
   created: 2026-05-26T12:00:00Z
 `
+
+func TestImageString(t *testing.T) {
+	defer test.ReportErr(t)
+
+	const imageName = "docker.io/goharbor/harbor-portal:v2.11.1"
+	assert := assert.New(t)
+
+	imageData := lock.ImageData{}
+	assert.Equal("", imageData.Digest.String())
+	imageData.Digest = opt.Reference(Try(images.Parse(imageName)))
+	assert.Equal(imageName, imageData.Digest.String())
+}
 
 func TestLoadSuccess(t *testing.T) {
 	defer test.ReportErr(t)
@@ -200,8 +214,11 @@ func TestDigestLockAndVerification(t *testing.T) {
 	_, err = lf.GetDigest(img2, images.RequestCount(counters), images.IncludeTag)
 	require.NoError(err)
 
+	err = lf.VerifyDigest(img2)
+	assert.NoError(err)
+
 	err = lf.VerifyDigest(img3)
-	require.NoError(err)
+	assert.ErrorIs(err, images.ErrNoDigest)
 
 	// Assert that no new external requests were made since we are unlocked and the digest should be available in memory.
 	assert.Zero(counters["index.docker.io"], "Expected zero additional registry requests when unlocking mode and verifying cached digest")
