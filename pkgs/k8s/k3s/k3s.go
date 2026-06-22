@@ -49,15 +49,16 @@ func SetHelmBinaryEnv(env string) {
 }
 
 func HelmBinary() string {
-	if helm, ok := helmBinary.GetOK(); ok {
-		return helm
-	} else {
+	var helm string
+	var ok bool
+	if helm, ok = helmBinary.GetOK(); !ok {
 		if helm = os.Getenv(envHelmBinary); helm == "" {
 			helm = DefaultHelmBinary
 		}
 		helmBinary.Set(helm)
-		return helm
+		slog.Debug(`Using helm binary "{{.helm}}"`, "helm", helm)
 	}
+	return helm
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
