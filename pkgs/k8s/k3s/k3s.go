@@ -70,15 +70,15 @@ func HelmBinary() string {
 	return helm
 }
 
-func HelmVersion() string {
-	if helmVersion.IsEmpty() {
+func HelmVersion() opt.Val[string] {
+	if helmBinary.IsEmpty() {
 		HelmBinary()
 	}
-	return helmVersion.GetOr("unknown")
+	return helmVersion
 }
 
-func HelmMajorVersion() string {
-	return semver.Major(HelmVersion())
+func HelmVersionAtLeast(version string) bool {
+	return semver.Compare(HelmVersion().GetOr("v0"), version) >= 0
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
@@ -158,6 +158,9 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	}
 	if hc.kubeVersion != "" {
 		helmCommand = append(helmCommand, "--dry-run=server")
+		if HelmVersionAtLeast("v4") {
+			helmCommand = append(helmCommand, "--take-ownership")
+		}
 	}
 	var output []byte
 	output = Try(run.Run(helmCommand...))

@@ -171,6 +171,6 @@ func TestHelmVersion(t *testing.T) {
 	if err != nil {
 		t.Skip()
 	}
-	version := k3s.HelmMajorVersion()
-	assert.True(t, version == "v4" || version == "v3", "unexpected helm version %q", version)
+	assert.True(t, k3s.HelmVersionAtLeast("v2"), "unexpected helm version %q", k3s.HelmVersion())
+	assert.False(t, k3s.HelmVersionAtLeast("v99"), "unexpected helm version %q", k3s.HelmVersion())
 }
