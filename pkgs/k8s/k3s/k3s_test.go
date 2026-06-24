@@ -3,6 +3,7 @@ package k3s_test
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
@@ -163,4 +164,13 @@ func TestHelmBinary(t *testing.T) {
 		}
 	})
 
+}
+
+func TestHelmVersion(t *testing.T) {
+	_, err := exec.LookPath("helm")
+	if err != nil {
+		t.Skip()
+	}
+	version := k3s.HelmMajorVersion()
+	assert.True(t, version == "v4" || version == "v3", "unexpected helm version %q", version)
 }
