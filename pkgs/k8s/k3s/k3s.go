@@ -19,6 +19,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 )
 
@@ -41,6 +42,7 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 var (
 	envHelmBinary = "IMG_PIN_HELM"
 	helmBinary    opt.Val[string]
+	helmVersion   opt.Val[string]
 )
 
 func SetHelmBinaryEnv(env string) {
@@ -56,9 +58,27 @@ func HelmBinary() string {
 			helm = DefaultHelmBinary
 		}
 		helmBinary.Set(helm)
-		slog.Debug(`Using helm binary "{{.helm}}"`, "helm", helm)
+		slog := slog.With("helm", helm)
+		if version, err := run.Run(helm, "version", "--short"); err != nil {
+			slog.Warn("Cannot determine version of '{{.helm}}': {{.err}}", "err", err.Error())
+			helmVersion.Unset()
+		} else {
+			helmVersion.Set(strings.TrimSpace(string(version)))
+		}
+		slog.Debug(`Using helm binary "{{.helm}} version {{.version}}"`, "version", helmVersion.GetOr("unknown"))
 	}
 	return helm
+}
+
+func HelmVersion() opt.Val[string] {
+	if helmBinary.IsEmpty() {
+		HelmBinary()
+	}
+	return helmVersion
+}
+
+func HelmVersionAtLeast(version string) bool {
+	return semver.Compare(HelmVersion().GetOr("v0"), version) >= 0
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
@@ -138,6 +158,9 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	}
 	if hc.kubeVersion != "" {
 		helmCommand = append(helmCommand, "--dry-run=server")
+		if HelmVersionAtLeast("v4") {
+			helmCommand = append(helmCommand, "--take-ownership")
+		}
 	}
 	var output []byte
 	output = Try(run.Run(helmCommand...))
