@@ -168,7 +168,7 @@ func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption
 			// considers to be non-fatal, so the logic here is to simply create a lock entry
 			// with no digest. If the lock file is eventually written, it will have captured
 			// this information. If the error was fatal, the lock data is ultimately discarded
-			// and this bad digest will non persist.
+			// and this bad digest will not persist.
 			slog.Debug("locking image digest: {{.key}}: no digest")
 		} else {
 			slog = slog.With("digest", &imageData.Digest)
@@ -192,10 +192,12 @@ func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption
 		}
 		if imageData.Digest.HasValue() {
 			*image = imageData.Digest.Get()
-			slog.Debug("retreived digest from lock file: {{.digest}}", "digest", image)
+			slog.Debug("retrieved digest from lock file: {{.digest}}", "digest", image)
 		} else {
+			// Assumption: this digest was non-fatally skipped when evaluated.
+			// Therefore we will return ErrSkipImage here.
 			err = images.ErrSkipImage
-			slog.Debug("retreived digest from lock file: {{.digest}}", "digest", image)
+			slog.Debug("no digest in lock file for: {{.image}}; assuming ErrSkipImage", "image", image)
 		}
 		created = imageData.Created.Time
 		if imageData.UnsupportedSchema == 1 {
