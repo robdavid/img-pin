@@ -18,7 +18,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/images"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var ErrNoAction = errors.New("no action provided")

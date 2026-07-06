@@ -19,8 +19,8 @@ import (
 	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
+	"go.yaml.in/yaml/v3"
 	"golang.org/x/mod/semver"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -48,6 +48,12 @@ var (
 func SetHelmBinaryEnv(env string) {
 	envHelmBinary = env
 	helmBinary.Unset()
+	helmVersion.Unset()
+}
+
+func UnsetHelmBinary() {
+	helmBinary.Unset()
+	helmVersion.Unset()
 }
 
 func HelmBinary() string {

@@ -8,7 +8,7 @@ import (
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var ErrYamlParse = errors.New("error parsing YAML")

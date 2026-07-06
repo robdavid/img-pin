@@ -3,7 +3,7 @@ package yaml
 import (
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // TrimMultiline walks a YAML AST and removes trailing

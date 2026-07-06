@@ -18,7 +18,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/images"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var (

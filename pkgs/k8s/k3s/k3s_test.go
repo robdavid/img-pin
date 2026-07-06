@@ -147,6 +147,8 @@ func TestHelmBinary(t *testing.T) {
 
 	const envName = "IMG_PIN_HELM"
 
+	defer k3s.UnsetHelmBinary()
+
 	t.Run("with default binary", func(t *testing.T) {
 		k3s.SetHelmBinaryEnv(envName)
 		os.Unsetenv(envName)
