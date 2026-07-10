@@ -2,13 +2,23 @@ package images_test
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/img-pin/pkgs/images"
+	helper "github.com/robdavid/img-pin/pkgs/internal/test/helpers/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var yesterday = time.Now().Add(-time.Hour * 24)
+var past = time.Now().Add(-time.Hour * 20000)
+var mkMock = helper.MakeMockDigest
+var mockDigests = []helper.MockDigest{
+	mkMock("4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90", yesterday, "docker.io/library/ubuntu:24.04"),
+	mkMock("5eba321fbeb624163a45c1aee5379caf6ec16fe6f644cc89f203a209eafba5eb", past, "docker.io/hashicorp/vault:1.13.3"),
+}
 
 func TestParseImage(t *testing.T) {
 	require := require.New(t)
@@ -46,6 +56,7 @@ func TestParseImage(t *testing.T) {
 func TestSetDigestNoTag(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helper.MockDigestImage(mockDigests))
 	img, err := images.Parse("ubuntu:24.04")
 	require.NoError(err)
 	assert.Empty(img.Digest)
@@ -59,6 +70,7 @@ func TestSetDigestNoTag(t *testing.T) {
 func TestSetDigestWithTag(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helper.MockDigestImage(mockDigests))
 	img, err := images.Parse("ubuntu:24.04")
 	require.NoError(err)
 	assert.Empty(img.Digest)
@@ -72,6 +84,7 @@ func TestSetDigestWithTag(t *testing.T) {
 func TestVerifyParsedImage(t *testing.T) {
 	test.ReportErr(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helper.MockDigestImage(mockDigests))
 	err := Try(images.Parse("hashicorp/vault:" + vaultTag + "@" + vaultDigest)).VerifyDigest()
 	assert.NoError(err)
 	err = Try(images.Parse("hashicorp/vault:" + vaultTag + "@" + vaultDigest)).VerifyDigest(images.ExpectDigest(vaultDigest))
@@ -93,6 +106,7 @@ func TestVerifyParsedImage(t *testing.T) {
 func TestUpdateParsedDigest(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, helper.MockDigestImage(mockDigests))
 	image := Try(images.Parse("hashicorp/vault:" + vaultTag + "@" + oldVaultDigest))
 	err := image.UpdateDigest(images.IncludeTag)
 	require.NoError(err)

@@ -59,118 +59,120 @@ func (rc RequestCounters) String() string {
 	return sb.String()
 }
 
-type imageOptions struct {
-	minAge          opt.Val[time.Duration]
-	includeTag      bool
-	requireTag      bool
-	requireDigest   bool
-	skipTime        bool
-	rejectLatest    bool
-	skipAuth        bool
-	policies        []Policy
-	expectedDigest  string
-	retries         int
-	delay           time.Duration
-	backoff         float64
-	requestCounters RequestCounters
+type ImageOptions struct {
+	MinAge          opt.Val[time.Duration]
+	IncludeTag      bool
+	RequireTag      bool
+	RequireDigest   bool
+	SkipTime        bool
+	RejectLatest    bool
+	SkipAuth        bool
+	Policies        []Policy
+	ExpectedDigest  string
+	Retries         int
+	Delay           time.Duration
+	Backoff         float64
+	RequestCounters RequestCounters
 }
 
-func defaultImageOptions() imageOptions {
-	io := imageOptions{
-		retries: 5,
-		delay:   2 * time.Second,
-		backoff: 1.5,
+func DefaultImageOptions() ImageOptions {
+	io := ImageOptions{
+		Retries: 5,
+		Delay:   2 * time.Second,
+		Backoff: 1.5,
 	}
 	if defaultPolicy != nil {
-		io.policies = []Policy{defaultPolicy}
+		io.Policies = []Policy{defaultPolicy}
 	}
 	return io
 }
 
-type ImageOption = func(*imageOptions)
+type ImageOption = func(*ImageOptions)
 
 type OptionsHolder interface {
 	ImageOptions() []ImageOption
 }
 
-func (io *imageOptions) apply(opts []ImageOption) {
+func (io *ImageOptions) Apply(opts []ImageOption) {
 	for _, f := range opts {
 		f(io)
 	}
 }
 
-// load loads up all the options. It may [Raise] errors
-func (io *imageOptions) load(opts []ImageOption) {
-	*io = defaultImageOptions()
-	io.apply(opts)
+// Load loads up all the options. It may [Raise] errors
+func (io *ImageOptions) Load(opts []ImageOption) {
+	*io = DefaultImageOptions()
+	io.Apply(opts)
 }
 
-func buildOptions(opts []ImageOption) *imageOptions {
-	options := defaultImageOptions()
-	options.apply(opts)
+// BuildOptions creates an [ImageOptions] object from a list
+// of [ImageOption] functions.
+func BuildOptions(opts []ImageOption) *ImageOptions {
+	options := DefaultImageOptions()
+	options.Apply(opts)
 	return &options
 }
 
 // IncludeTag causes the returned digested reference to include the original
 // tag, (in the suffix format :tag@sha256:...)if it exists. By default, only the
 // digest is included (in the suffix format @sha256:...).
-func IncludeTag(io *imageOptions) { io.includeTag = true }
+func IncludeTag(io *ImageOptions) { io.IncludeTag = true }
 
 // RequireTag causes ImageDigestedReference to return an error if the provided
 // image reference does not include a tag.
-func RequireTag(io *imageOptions) { io.requireTag = true }
+func RequireTag(io *ImageOptions) { io.RequireTag = true }
 
 // RequireDigest causes ImageDigestedReference to return an error if the
 // provided image reference does not include a digest.
-func RequireDigest(io *imageOptions) { io.requireDigest = true }
+func RequireDigest(io *ImageOptions) { io.RequireDigest = true }
 
 // RejectLatest causes ImageDigestedReference to return an error if the provided
 // image reference includes the :latest tag or has no tag at all (implying :latest).
-func RejectLatest(io *imageOptions) { io.rejectLatest = true }
+func RejectLatest(io *ImageOptions) { io.RejectLatest = true }
 
 // Skip checking the image creation time, unless MinimumAge is specified. The
 // returned creation time will be the zero time. This saves an API call.
-func SkipTime(io *imageOptions) { io.skipTime = true }
+func SkipTime(io *ImageOptions) { io.SkipTime = true }
 
 // FetchTime asks the image digester to fetch the image build time. Undoes
 // the effect of [SkipTime].
-func FetchTime(io *imageOptions) { io.skipTime = false }
+func FetchTime(io *ImageOptions) { io.SkipTime = false }
 
 // Skip digests on images that are in a registry that requires authentication,
 // but for which we don't have the credentials.
-func SkipAuth(io *imageOptions) { io.skipAuth = true }
+func SkipAuth(io *ImageOptions) { io.SkipAuth = true }
 
 // MinimumAge causes ImageDigestedReference to return an error if the provided
 // image was created less than the provided age ago.
 func MinimumAge(age time.Duration) ImageOption {
-	return func(io *imageOptions) {
+	return func(io *ImageOptions) {
 		if age <= 0 {
-			io.minAge = opt.Empty[time.Duration]()
+			io.MinAge = opt.Empty[time.Duration]()
 		} else {
-			io.minAge = opt.Value(age)
+			io.MinAge = opt.Value(age)
 		}
 	}
 }
 
 // ExpectDigest requires the incoming image have a digest.
 func ExpectDigest(digest string) ImageOption {
-	return func(io *imageOptions) { io.expectedDigest = digest }
+	return func(io *ImageOptions) { io.ExpectedDigest = digest }
 }
 
 func Retries(count int, initialDelay time.Duration, backoff float64) ImageOption {
 	if backoff < 1 || initialDelay < 0 || count < 0 {
 		panic("invalid retry configuration")
 	}
-	return func(io *imageOptions) {
-		io.retries = count
-		io.delay = initialDelay
-		io.backoff = backoff
+	return func(io *ImageOptions) {
+		io.Retries = count
+		io.Delay = initialDelay
+		io.Backoff = backoff
 	}
 }
 
 func RequestCount(counters map[string]int) ImageOption {
-	return func(io *imageOptions) {
-		io.requestCounters = counters
+	return func(io *ImageOptions) {
+		io.RequestCounters = counters
 	}
 }
 
@@ -190,21 +192,21 @@ func RequestCount(counters map[string]int) ImageOption {
 
 func Digest(image string, options ...ImageOption) (digested string, digest string, created time.Time, err error) {
 	defer Catch(&err)
-	var opts imageOptions
-	opts.load(options)
-	retries := max(opts.retries, 1)
+	var opts ImageOptions
+	opts.Load(options)
+	retries := max(opts.Retries, 1)
 	var attempt int
 	for attempt = 0; attempt < retries; {
-		digested, digest, created, err = digestImage(image, &opts)
-		if err == nil || !errors.Is(err, ErrTooManyRequests) || opts.delay == 0 {
+		digested, digest, created, err = digestDispatch(image, &opts)
+		if err == nil || !errors.Is(err, ErrTooManyRequests) || opts.Delay == 0 {
 			return
 		}
 		attempt++
 		if attempt < retries {
 			fmt.Fprintf(os.Stderr, "%s: request rate error, attempt %d/%d: %s (retrying in %s)\n",
-				os.Args[0], attempt, retries, err, opts.delay)
-			time.Sleep(opts.delay)
-			opts.delay = time.Duration(float64(opts.delay) * opts.backoff)
+				os.Args[0], attempt, retries, err, opts.Delay)
+			time.Sleep(opts.Delay)
+			opts.Delay = time.Duration(float64(opts.Delay) * opts.Backoff)
 		}
 	}
 	return
@@ -221,7 +223,7 @@ func isSchemaV1Err(err error) bool {
 		func(req string) bool { return strings.Contains(errText, req) })
 }
 
-func digestImage(image string, opts *imageOptions) (digested string, digest string, created time.Time, err error) {
+func digestImage(image string, opts *ImageOptions) (digested string, digest string, created time.Time, err error) {
 	var ref name.Reference
 
 	decorateErr := func(e error) error {
@@ -255,37 +257,37 @@ func digestImage(image string, opts *imageOptions) (digested string, digest stri
 	auth := remote.WithAuthFromKeychain(authn.DefaultKeychain)
 	var ok bool
 	if _, ok = ref.(name.Digest); ok {
-		if opts.requireTag {
+		if opts.RequireTag {
 			err = ErrNoTag
 		}
 		digested = ref.String()
 		digest = ref.Identifier()
 	} else {
-		if opts.rejectLatest && ref.Identifier() == "latest" {
+		if opts.RejectLatest && ref.Identifier() == "latest" {
 			err = ferrors.Join(err, ErrLatestTag)
-		} else if opts.requireDigest {
+		} else if opts.RequireDigest {
 			err = ferrors.Join(err, ErrNoDigest)
 		} else {
-			if opts.requestCounters != nil {
-				opts.requestCounters[ref.Context().RegistryStr()]++
+			if opts.RequestCounters != nil {
+				opts.RequestCounters[ref.Context().RegistryStr()]++
 			}
 			digest = Try(remote.Get(ref, auth)).Digest.String()
-			if opts.includeTag {
+			if opts.IncludeTag {
 				digested = ref.Context().Tag(ref.Identifier() + "@" + digest).String()
 			} else {
 				digested = ref.Context().Digest(digest).String()
 			}
 		}
 	}
-	if !(opts.skipTime && opts.minAge.IsEmpty()) {
-		if opts.requestCounters != nil {
+	if !(opts.SkipTime && opts.MinAge.IsEmpty()) {
+		if opts.RequestCounters != nil {
 			// assuming both of the next two calls generate a request.
-			opts.requestCounters[ref.Context().RegistryStr()] += 2
+			opts.RequestCounters[ref.Context().RegistryStr()] += 2
 		}
 		img := Try(remote.Image(ref, auth))
 		cnf := Try(img.ConfigFile())
 		created = cnf.Created.Time
-		if minAge, ok := opts.minAge.GetOK(); ok {
+		if minAge, ok := opts.MinAge.GetOK(); ok {
 			age := time.Since(created)
 			// fmt.Fprintf(os.Stderr, "%q: check age is %s (>=%s: %t)\n", image, age.Round(time.Second), minAge, age >= minAge)
 			if age < minAge {

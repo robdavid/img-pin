@@ -33,24 +33,24 @@ type Policy = func(*PolicyContext) error
 
 // AddPolicy returns an image option that adds the provided policy object to the list of policies
 func AddPolicy(p Policy) ImageOption {
-	return func(o *imageOptions) {
-		o.policies = append(o.policies, p)
+	return func(o *ImageOptions) {
+		o.Policies = append(o.Policies, p)
 	}
 }
 
 func AddNamedPolicy(name string) ImageOption {
 	p := policyRegistry[name]
-	return func(o *imageOptions) {
+	return func(o *ImageOptions) {
 		if p == nil {
 			Raise(fmt.Errorf("%s: %w", name, ErrPolicyNotFound))
 		} else {
-			o.policies = append(o.policies, p)
+			o.Policies = append(o.Policies, p)
 		}
 	}
 }
 
-func ClearPolicies(o *imageOptions) {
-	o.policies = nil
+func ClearPolicies(o *ImageOptions) {
+	o.Policies = nil
 }
 
 func PolicyList(ps ...Policy) Policy {
@@ -140,27 +140,27 @@ func zeroF[T any]() T {
 }
 
 func ApplyPolicies(image *Image, options ...ImageOption) (pol *PolicyContext, err error) {
-	var opts imageOptions
+	var opts ImageOptions
 	defer Catch(&err)
-	opts.load(options)
+	opts.Load(options)
 	pol = &PolicyContext{Image: image, Options: &options}
-	err = pol.ApplyPolicies(opts.policies...)
+	err = pol.ApplyPolicies(opts.Policies...)
 	return
 }
 
 func (img *Image) getOrCheckDigest(options []ImageOption, refreshDigest bool) (
-	digested string, digest string, created time.Time, resolvedOptions *imageOptions, err error) {
-	var opts imageOptions
+	digested string, digest string, created time.Time, resolvedOptions *ImageOptions, err error) {
+	var opts ImageOptions
 	resolvedOptions = &opts
-	opts.load(options)
+	opts.Load(options)
 	pol := PolicyContext{Image: img, Options: &options}
-	if err = pol.ApplyPolicies(opts.policies...); err != nil {
+	if err = pol.ApplyPolicies(opts.Policies...); err != nil {
 		return
 	}
-	if refreshDigest && img.Digest == "" && opts.expectedDigest == "" {
+	if refreshDigest && img.Digest == "" && opts.ExpectedDigest == "" {
 		err = fmt.Errorf("%q: %w", img, ErrNoDigest)
 		return
-	} else if !refreshDigest && img.Digest != "" && opts.skipTime {
+	} else if !refreshDigest && img.Digest != "" && opts.SkipTime {
 		// Nothing to do
 		return
 	}
@@ -176,7 +176,7 @@ func (img *Image) getOrCheckDigest(options []ImageOption, refreshDigest bool) (
 			taggedImg.Digest = ""
 		}
 		if digested, digest, created, err = Digest(taggedImg.String(), options...); err != nil {
-			if opts.skipAuth && errors.Is(err, ErrUnauthorized) {
+			if opts.SkipAuth && errors.Is(err, ErrUnauthorized) {
 				err = fmt.Errorf("%q: %w", img, ErrSkipImage)
 			}
 			if i == 0 && errors.Is(err, ErrImageNotFound) {
@@ -207,7 +207,7 @@ func (img *Image) GetDigest(options ...ImageOption) (created time.Time, err erro
 
 func (img *Image) VerifyDigest(options ...ImageOption) (err error) {
 	var digest string
-	var opts *imageOptions
+	var opts *ImageOptions
 	defer Catch(&err)
 
 	_, digest, _, opts, err = img.getOrCheckDigest(slices.Affix(options, SkipTime), true)
@@ -215,12 +215,12 @@ func (img *Image) VerifyDigest(options ...ImageOption) (err error) {
 		return
 	}
 
-	if (opts.expectedDigest != "" && digest != opts.expectedDigest) || (opts.expectedDigest == "" && digest != img.Digest) {
+	if (opts.ExpectedDigest != "" && digest != opts.ExpectedDigest) || (opts.ExpectedDigest == "" && digest != img.Digest) {
 		err = ErrDigestMismatch
 		if img.Tag != "" && img.Digest != "" && digest != img.Digest {
 			err = fmt.Errorf("%w (%w)", err, ErrTagDrift)
 		}
-		expectedDigest := functions.IfElse(opts.expectedDigest != "", opts.expectedDigest, img.Digest)
+		expectedDigest := functions.IfElse(opts.ExpectedDigest != "", opts.ExpectedDigest, img.Digest)
 		err = fmt.Errorf("%q: %w: %q != %q", img, err, digest, expectedDigest)
 	}
 	return
