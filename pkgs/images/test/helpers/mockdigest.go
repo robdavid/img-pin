@@ -1,4 +1,4 @@
-package images
+package helpers
 
 import (
 	"fmt"
@@ -61,6 +61,9 @@ func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 				digested = image + ":latest@" + digest
 			} else {
 				digested = image + "@" + digest
+			}
+			if min, ok := opts.MinAge.GetOK(); ok && time.Since(created) < min {
+				err = images.ErrImageTooRecent
 			}
 		}
 

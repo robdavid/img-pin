@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/robdavid/img-pin/pkgs/images"
+	"github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,6 +13,7 @@ import (
 func TestShortAgePolicy(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	img, err := images.Parse("ubuntu:24.04")
 	assert.NoError(err)
 	created, err := img.GetDigest(images.AddPolicy(images.DefaultMinAgePolicy(365 * 24 * time.Hour)))
@@ -22,6 +24,7 @@ func TestShortAgePolicy(t *testing.T) {
 
 func TestUpdateGroup(t *testing.T) {
 	assert := assert.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	img, err := images.Parse("ubuntu:24.04")
 	assert.NoError(err)
 	ip := images.ImageParts{Registry: "public.ecr.aws", Group: "library"}
