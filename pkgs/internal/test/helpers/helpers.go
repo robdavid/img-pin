@@ -20,6 +20,7 @@ func CopyToTemp(t *testing.T, filename string) string {
 	ext := filepath.Ext(name)
 	dst := Try(os.CreateTemp(dir, name[:len(name)-len(ext)]+"-*.tmp"+ext))
 	defer dst.Close()
+	t.Cleanup(func() { os.Remove(dst.Name()) })
 	Try(io.Copy(dst, src))
 	return dst.Name()
 }
@@ -32,6 +33,9 @@ type TempDir struct {
 func (td *TempDir) Delete() error { return os.RemoveAll(td.Dir) }
 func (fd *TempDir) First() string { return fd.Files[0] }
 
+// CopyToTempDir creates a temporary directory and copies the provided files to that directory
+// a [TempDir] object is returned that contains details about the directory and files. It adds
+// a cleanup handler to t to remove the temporary directory after the test.
 func CopyToTempDir(t *testing.T, filenames ...string) (tmpDir TempDir) {
 	t.Helper()
 	defer Handle(func(e error) {
@@ -42,6 +46,7 @@ func CopyToTempDir(t *testing.T, filenames ...string) (tmpDir TempDir) {
 	}
 	dir := filepath.Dir(filenames[0])
 	tmpDir.Dir = Try(os.MkdirTemp(dir, "tmp-*"))
+	t.Cleanup(func() { tmpDir.Delete() })
 	for _, filename := range filenames {
 		src := Try(os.Open(filename))
 		defer src.Close()

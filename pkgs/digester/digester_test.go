@@ -13,6 +13,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
 	"github.com/robdavid/img-pin/pkgs/images"
+	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/internal/test/helpers"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/workload"
@@ -24,7 +25,7 @@ import (
 func TestDigestK3S(t *testing.T) {
 	defer test.ReportErr(t)
 	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
-	defer os.Remove(tempFile)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	eh.Check(digester.CreateDigests(tempFile))
 	content := eh.Try(os.ReadFile(tempFile))
 	re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
@@ -36,7 +37,7 @@ func TestDigestK3S(t *testing.T) {
 func TestDigestK3SPatch(t *testing.T) {
 	defer test.ReportErr(t)
 	tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
-	defer tempDir.Delete()
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	eh.Check(digester.CreateDigests(tempDir.First(),
 		digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
 	content := eh.Try(os.ReadFile(tempDir.First()))

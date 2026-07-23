@@ -19,6 +19,7 @@ const oldVaultDigest = "sha256:c186e9bff2db0bd61dad70e7733cbfa5a0f8ddee3a6a061f3
 func TestParseImage(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	img, err := images.Parse("ubuntu:24.04")
 	require.NoError(err)
 	assert.Equal("docker.io", img.Registry)
