@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,22 +13,55 @@ type MockDigest struct {
 	Sources []string
 	Digest  string
 	Created time.Time
+	Err     error
+}
+
+var reDigest = regexp.MustCompile(`[0-9a-z]{64}`)
+var reImage = regexp.MustCompile(`[a-z0-9\.-]+/[a-z0-9-]+/[a-z0-9-]+:[0-9a-z\.\+]+`)
+
+func (md *MockDigest) validate() {
+	if md.Digest != "" && !reDigest.MatchString(md.Digest) {
+		panic(fmt.Errorf("bad digest string %q (does not match %s)", md.Digest, reDigest.String()))
+	}
+	for _, source := range md.Sources {
+		if !reImage.MatchString(source) {
+			panic(fmt.Errorf("bad image string %q (does not match %s)", source, reImage.String()))
+		}
+	}
 }
 
 func MakeMockDigest(digest string, created time.Time, sources ...string) MockDigest {
-	return MockDigest{
+	md := MockDigest{
 		Sources: sources,
 		Digest:  digest,
 		Created: created,
 	}
+	md.validate()
+	return md
 }
+
+func MakeMockDigestErr(err error, sources ...string) MockDigest {
+	md := MockDigest{
+		Sources: sources,
+		Err:     err,
+	}
+	md.validate()
+	return md
+}
+
+const sha256Prefix = "sha256:"
 
 func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 	digestMap := make(map[string]*MockDigest)
 	for m := range mocks {
 		mock := &mocks[m]
 		for _, s := range mock.Sources {
+			digest := mock.Digest
 			digestMap[s] = mock
+			digestMap[s+"@"+sha256Prefix+digest] = mock
+			if t := strings.LastIndex(s, ":"); t >= 0 {
+				digestMap[s[:t]+"@"+sha256Prefix+digest] = mock
+			}
 		}
 	}
 	return func(image string, opts *images.ImageOptions) (digested string, digest string, created time.Time, err error) {
@@ -38,11 +72,12 @@ func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 		}()
 		if mockDigest, ok := digestMap[image]; !ok {
 			err = images.ErrImageNotFound
+		} else if mockDigest.Err != nil {
+			err = mockDigest.Err
 		} else {
-			const prefix = "sha256:"
 			digest = mockDigest.Digest
-			if !strings.HasPrefix(digest, prefix) {
-				digest = prefix + digest
+			if !strings.HasPrefix(digest, sha256Prefix) {
+				digest = sha256Prefix + digest
 			}
 			created = mockDigest.Created
 			if pos := strings.LastIndex(image, ":"); pos >= 0 {
