@@ -11,6 +11,7 @@ import (
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/images"
+	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"github.com/stretchr/testify/assert"
@@ -46,6 +47,7 @@ func (n noSkipOptions) ImageOptions() []images.ImageOption {
 func TestLoadingFullValues(t *testing.T) {
 	defer test.ReportErr(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 	require.Equal(2, len(docs))
 	deployment := k3s.HelmChartDeployment{}
@@ -63,6 +65,7 @@ func TestLoadingChartValues(t *testing.T) {
 	defer test.ReportErr(t)
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 	require.Equal(2, len(docs))
 	deployment := k3s.HelmChartDeployment{}
@@ -75,6 +78,7 @@ func TestLoadingOverrides(t *testing.T) {
 	defer test.ReportErr(t)
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 	require.Equal(2, len(docs))
 	deployment := k3s.HelmChartDeployment{}
@@ -91,6 +95,7 @@ func TestHelmUpdate(t *testing.T) {
 	defer test.ReportErr(t)
 	// assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 	require.Equal(2, len(docs))
 	deployment := k3s.HelmChartDeployment{}
@@ -104,6 +109,7 @@ func TestValueSet(t *testing.T) {
 	defer test.ReportErr(t)
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
 	require.Equal(1, len(docs))
 	deployment := k3s.HelmChartDeployment{}
@@ -131,6 +137,7 @@ func TestCrds(t *testing.T) {
 	defer test.ReportErr(t)
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
 	require.Equal(1, len(docs))
 	deployment := k3s.HelmChartDeployment{}

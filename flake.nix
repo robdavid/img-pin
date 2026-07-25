@@ -22,6 +22,8 @@
               gopls
               delve
               kubernetes-helm
+              docker-client
+              bashInteractive # https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
             ];
             hardeningDisable = [ "fortify" ];
           };

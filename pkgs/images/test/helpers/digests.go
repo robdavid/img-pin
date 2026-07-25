@@ -14,9 +14,12 @@ var mkMock = MakeMockDigest
 var errMock = MakeMockDigestErr
 var CommonMockDigests = []MockDigest{
 	mkMock("4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90", yesterday, "docker.io/library/ubuntu:24.04"),
+	mkMock("de0eb0b3f2a47ba1eb89389859a9bd88b28e82f5826b6969ad604979713c2d4f", past, "docker.io/library/alpine:3.18"),
 	mkMock("5eba321fbeb624163a45c1aee5379caf6ec16fe6f644cc89f203a209eafba5eb", past, "docker.io/hashicorp/vault:1.13.3"),
-	mkMock("b7a54e6b04ffe19096cc5a788fa3364bc2dea742c26a990ea3270bf20eaa723d", past, "docker.io/goharbor/nginx-photon:v2.11.1"),
+	mkMock("b7a54e6b04ffe19096cc5a788fa3364bc2dea742c26a990ea3270bf20eaa723d", past, "docker.io/goharbor/nginx-photon:v2.11.1", "goharbor/nginx-photon:v2.11.1"),
+	mkMock("d8ce6327e5c55d8403542503e9e64919008c26b9d9dbf2b5cf2a85fea40c6a1a", past, "docker.io/goharbor/nginx-photon:v2.11.2", "goharbor/nginx-photon:v2.11.2"),
 	mkMock("e35d3cac38395f0c306d83ac9b587c73a93188040ec018f7e8fcfe015e507175", past, "docker.io/goharbor/harbor-portal:v2.11.1"),
+	mkMock("24498a84d9fb814e38f8c9d48b83738af79d8c028d49e25137316b968bbd76cc", past, "docker.io/goharbor/harbor-portal:v2.11.2"),
 	mkMock("c017dd84ee96df33f54677fce6a03e3dc8e00e2557447edc6015e42f34452236", past, "docker.io/goharbor/harbor-core:v2.11.1"),
 	mkMock("30edb2ca02e57bf6cbcac36fdea373ba6551942637c9f404c127cc8c9446f837", past, "docker.io/goharbor/harbor-jobservice:v2.11.1"),
 	mkMock("5645d459af2ba7200020a3473bc345ae87a2e2e189375b9a04cd6ec035c850fa", past, "docker.io/goharbor/registry-photon:v2.11.1"),

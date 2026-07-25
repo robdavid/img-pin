@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDigestK3S(t *testing.T) {
+func TestDigestK3S(t *testing.T) { //test
 	defer test.ReportErr(t)
 	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
@@ -112,7 +112,7 @@ func TestDigestSchemaV1Skipped(t *testing.T) {
 	defer test.ReportErr(t)
 	assert := assert.New(t)
 	tempFile := helpers.CopyToTemp(t, "tests/dex.yaml")
-	defer os.Remove(tempFile)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	err := digester.CreateDigests(tempFile, digester.ImageOptions(images.MinimumAge(time.Hour*24)), digester.SkipV1Schema)
 	assert.NoError(err)
 	fmt.Println(err)

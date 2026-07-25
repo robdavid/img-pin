@@ -13,6 +13,7 @@ import (
 	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/images"
+	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,7 @@ func TestImageString(t *testing.T) {
 	const imageName = "docker.io/goharbor/harbor-portal:v2.11.1"
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	imageData := lock.ImageData{}
 	assert.Equal("", imageData.Digest.String())
 	imageData.Digest = opt.Reference(Try(images.Parse(imageName)))
@@ -48,6 +50,7 @@ func TestLoadSuccess(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "lock.yaml")
 	err := os.WriteFile(fpath, []byte(testLockYaml), 0644)
@@ -73,6 +76,7 @@ func TestLoadMissingFile(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "nonexistent.yaml")
 
@@ -86,6 +90,7 @@ func TestLoadCreateIfMissing(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "new.yaml")
 
@@ -105,6 +110,7 @@ func TestTimeRoundTrip(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	now := time.Date(2026, time.May, 26, 12, 0, 0, 0, time.UTC)
 	created := lock.Time{Time: now}
 	val, err := created.MarshalYAML()
@@ -123,6 +129,7 @@ func TestTimeRoundTrip(t *testing.T) {
 func TestLoadInvalidYaml(t *testing.T) {
 	require := require.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "bad.yaml")
 	err := os.WriteFile(fpath, []byte(":: invalid yaml :: {"), 0644)
@@ -137,6 +144,7 @@ func TestLockOneImage(t *testing.T) {
 	const imageName = "docker.io/goharbor/harbor-portal:v2.11.1"
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	lf := lock.Make()
 	lf.Locking = true
 	img, err := images.Parse(imageName)
@@ -161,6 +169,7 @@ func TestDigestLockAndVerification(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	// Use a consistent image for testing digest calculation flow
 	const imageName = "docker.io/goharbor/harbor-portal:v2.11.1"
 	const nextImageName = "docker.io/goharbor/harbor-portal:v2.11.2"
@@ -238,6 +247,7 @@ func TestDigestLockAndVerification(t *testing.T) {
 func TestLockPredigested(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	const imageName = "goharbor/harbor-portal:v2.11.2@sha256:24498a84d9fb814e38f8c9d48b83738af79d8c028d49e25137316b968bbd76cc"
 	var img1, img2, img3 *images.Image
 	var err error
@@ -282,6 +292,7 @@ func TestGetDigest_SkippedByPolicy(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	lf := lock.Make()
 	lf.Locking = true
 

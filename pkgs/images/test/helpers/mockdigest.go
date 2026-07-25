@@ -17,7 +17,7 @@ type MockDigest struct {
 }
 
 var reDigest = regexp.MustCompile(`[0-9a-z]{64}`)
-var reImage = regexp.MustCompile(`[a-z0-9\.-]+/[a-z0-9-]+/[a-z0-9-]+:[0-9a-z\.\+]+`)
+var reImage = regexp.MustCompile(`(:?[a-z0-9\.-]+/)?[a-z0-9-]+/[a-z0-9-]+:[0-9a-z\.\+]+`)
 
 func (md *MockDigest) validate() {
 	if md.Digest != "" && !reDigest.MatchString(md.Digest) {
@@ -79,6 +79,7 @@ func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 			if !strings.HasPrefix(digest, sha256Prefix) {
 				digest = sha256Prefix + digest
 			}
+			image := mockDigest.Sources[0]
 			created = mockDigest.Created
 			if pos := strings.LastIndex(image, ":"); pos >= 0 {
 				if opts.RejectLatest && image[pos+1:] == "latest" {
@@ -96,6 +97,14 @@ func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 				digested = image + ":latest@" + digest
 			} else {
 				digested = image + "@" + digest
+			}
+			if opts.RequestCounters != nil && !strings.Contains(image, digest) {
+				parts := strings.Split(mockDigest.Sources[0], "/")
+				registry := parts[0]
+				if registry == "docker.io" {
+					registry = "index.docker.io"
+				}
+				opts.RequestCounters[registry] += 3
 			}
 			if min, ok := opts.MinAge.GetOK(); ok && time.Since(created) < min {
 				err = images.ErrImageTooRecent
