@@ -20,7 +20,15 @@ func (e *RunError) Unwrap() error {
 	return e.Err
 }
 
+type RunFunc = func(args ...string) ([]byte, error)
+
+var runDispatch RunFunc = run
+
 func Run(args ...string) ([]byte, error) {
+	return runDispatch(args...)
+}
+
+func run(args ...string) ([]byte, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("run: no command")
 	}

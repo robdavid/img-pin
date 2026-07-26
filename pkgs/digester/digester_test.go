@@ -17,10 +17,18 @@ import (
 	"github.com/robdavid/img-pin/pkgs/internal/test/helpers"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/workload"
+	runhelpers "github.com/robdavid/img-pin/pkgs/run/test/helpers"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	cleanup := runhelpers.CaptureMainTo("digester-capture.json")
+	exitCode := m.Run()
+	cleanup()
+	os.Exit(exitCode)
+}
 
 func TestDigestK3S(t *testing.T) { //test
 	defer test.ReportErr(t)
