@@ -14,7 +14,7 @@
       "akri",
       "akri",
       "--values",
-      "/tmp/helmchart-values-1973146775.yaml",
+      "/tmp/helmchart-values-1336496511.yaml",
       "--version",
       "0.13.8",
       "--repo",
