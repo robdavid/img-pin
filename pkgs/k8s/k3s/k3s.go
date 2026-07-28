@@ -56,6 +56,10 @@ func UnsetHelmBinary() {
 	helmVersion.Unset()
 }
 
+func UnsetHelmBinaryEnv() {
+	os.Unsetenv(envHelmBinary)
+}
+
 func HelmBinary() string {
 	var helm string
 	var ok bool

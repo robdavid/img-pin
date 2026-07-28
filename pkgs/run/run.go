@@ -7,9 +7,11 @@ import (
 	"os/exec"
 )
 
+// RunError represents an error executing a command. It contains the underlying error, and
+// any standard error output.
 type RunError struct {
-	Stderr []byte
-	Err    error
+	Stderr []byte // Stderr contains any command output standard error.
+	Err    error  // Err is the underlying error.
 }
 
 func (e *RunError) Error() string {
@@ -20,10 +22,14 @@ func (e *RunError) Unwrap() error {
 	return e.Err
 }
 
+// RunFunc is the type signature of the [Run] function.
 type RunFunc = func(args ...string) ([]byte, error)
 
 var runDispatch RunFunc = run
 
+// Run executes a system command with the command and arguments in args. It returns the output
+// of the command or an error. If there is an error it is of type [RunError] which captures
+// the underlying error and any stderr output.
 func Run(args ...string) ([]byte, error) {
 	return runDispatch(args...)
 }

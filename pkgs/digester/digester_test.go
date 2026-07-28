@@ -15,6 +15,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/images"
 	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/internal/test/helpers"
+	"github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/workload"
 	runhelpers "github.com/robdavid/img-pin/pkgs/run/test/helpers"
@@ -23,17 +24,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(m *testing.M) {
-	cleanup := runhelpers.CaptureMainTo("digester-capture.json")
-	exitCode := m.Run()
-	cleanup()
-	os.Exit(exitCode)
+func cleanSetup() {
+	k3s.UnsetHelmBinary()
+	k3s.UnsetHelmBinaryEnv()
 }
 
 func TestDigestK3S(t *testing.T) { //test
 	defer test.ReportErr(t)
+	cleanSetup()
 	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	//runhelpers.Capture(t, "tests/run-*.json")
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	eh.Check(digester.CreateDigests(tempFile))
 	content := eh.Try(os.ReadFile(tempFile))
 	re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
@@ -44,8 +46,10 @@ func TestDigestK3S(t *testing.T) { //test
 
 func TestDigestK3SPatch(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	eh.Check(digester.CreateDigests(tempDir.First(),
 		digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
 	content := eh.Try(os.ReadFile(tempDir.First()))
@@ -57,8 +61,10 @@ func TestDigestK3SPatch(t *testing.T) {
 
 func TestDigestVerifyK3S(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	err := digester.VerifyDigests(tempFile)
 	assert.ErrorIs(t, err, images.ErrNoDigest)
 	fmt.Printf("%v\n", err)
@@ -66,9 +72,11 @@ func TestDigestVerifyK3S(t *testing.T) {
 
 func TestDigestKube(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	assert := assert.New(t)
 	tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	dig := eh.Try(digester.DigestKube(tempDir.First(), digester.UseLockfile))
 	assert.Greater(len(dig.Resources), 30)
 	var buffer bytes.Buffer
@@ -83,9 +91,11 @@ func TestDigestKube(t *testing.T) {
 
 func TestDigestKubeList(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	assert := assert.New(t)
 	tempFile := helpers.CopyToTemp(t, "tests/akri.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	dig := eh.Try(digester.DigestKube(tempFile, digester.UseLockfile))
 	digester.WriteCombinedDigests([]*digester.Digester{dig}, os.Stdout)
 	assert.Greater(len(dig.Resources), 19)
@@ -93,10 +103,12 @@ func TestDigestKubeList(t *testing.T) {
 
 func TestDigestK8S(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	require := require.New(t)
 	assert := assert.New(t)
 	tempFile := helpers.CopyToTemp(t, "tests/opag.yaml")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	eh.Check(digester.CreateDigests(tempFile))
 	content := eh.Try(os.ReadFile(tempFile))
 	buf := bytes.NewBuffer(content)
@@ -108,8 +120,10 @@ func TestDigestK8S(t *testing.T) {
 
 func TestDigestSchemaV1(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	assert := assert.New(t)
 	tempFile := helpers.CopyToTemp(t, "tests/dex.yaml")
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	err := digester.CreateDigests(tempFile, digester.ImageOptions(images.MinimumAge(time.Hour*24)))
 	assert.ErrorIs(err, images.ErrSchemaV1)
@@ -118,8 +132,10 @@ func TestDigestSchemaV1(t *testing.T) {
 
 func TestDigestSchemaV1Skipped(t *testing.T) {
 	defer test.ReportErr(t)
+	cleanSetup()
 	assert := assert.New(t)
 	tempFile := helpers.CopyToTemp(t, "tests/dex.yaml")
+	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
 	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	err := digester.CreateDigests(tempFile, digester.ImageOptions(images.MinimumAge(time.Hour*24)), digester.SkipV1Schema)
 	assert.NoError(err)

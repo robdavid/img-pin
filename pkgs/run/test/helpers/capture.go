@@ -2,24 +2,12 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"strings"
 
 	"github.com/robdavid/img-pin/pkgs/run"
 )
-
-type CommandError string
-
-func (ce *CommandError) IsNil() bool { return *ce == "" }
-
-type CommandResponse struct {
-	CmdAndArgs []string     `json:"cmdAndArgs"`
-	Response   string       `json:"response"`
-	Error      CommandError `json:"error"`
-}
-
-type CommandResponses []CommandResponse
-
-func (crs *CommandResponses) Append(cr CommandResponse) { *crs = append(*crs, cr) }
 
 // CaptureWrap wraps the run function, returning a function that unwraps it.
 // It delegates to the underlying function whilst capturing the commands and their results and placing the results in crs.
@@ -30,7 +18,11 @@ func CaptureWrap(crs *CommandResponses) (cleanup func()) {
 			var response []byte
 			cr := CommandResponse{CmdAndArgs: args}
 			if response, err = wrapped(args...); err != nil {
-				cr.Error = CommandError(err.Error())
+				cr.Error = &CommandError{Text: err.Error()}
+				var runError *run.RunError
+				if errors.As(err, &runError) {
+					cr.Error.Stderr = string(runError.Stderr)
+				}
 			} else {
 				cr.Response = string(response)
 			}
@@ -60,7 +52,7 @@ func (cs *CaptureState) WriteOutput() error {
 	return encoder.Encode(cs.Responses)
 }
 
-func CaptureMainTo(outputFile string) (cleanup func()) {
+func CaptureMain(outputFile string) (cleanup func()) {
 	cs := CaptureState{OutputFile: outputFile}
 	unwrap := cs.WrapRun()
 	cleanup = func() {
@@ -70,4 +62,12 @@ func CaptureMainTo(outputFile string) (cleanup func()) {
 		}
 	}
 	return
+}
+
+func mockFile(t Testable, template string) string {
+	return strings.Replace(template, "*", t.Name(), 1)
+}
+
+func Capture(t Testable, outputFile string) {
+	t.Cleanup(CaptureMain(mockFile(t, outputFile)))
 }
