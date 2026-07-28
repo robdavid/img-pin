@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/robdavid/img-pin/pkgs/run"
@@ -42,6 +43,10 @@ type CaptureState struct {
 func (cs *CaptureState) WrapRun() (cleanup func()) { return CaptureWrap(&cs.Responses) }
 
 func (cs *CaptureState) WriteOutput() error {
+	dir := filepath.Dir(cs.OutputFile)
+	if err := os.MkdirAll(dir, 0o777); err != nil {
+		return err
+	}
 	output, err := os.Create(cs.OutputFile)
 	if err != nil {
 		return err
@@ -57,8 +62,10 @@ func CaptureMain(outputFile string) (cleanup func()) {
 	unwrap := cs.WrapRun()
 	cleanup = func() {
 		unwrap()
-		if err := cs.WriteOutput(); err != nil {
-			panic(err)
+		if len(cs.Responses) > 0 {
+			if err := cs.WriteOutput(); err != nil {
+				panic(err)
+			}
 		}
 	}
 	return
@@ -69,5 +76,6 @@ func mockFile(t Testable, template string) string {
 }
 
 func Capture(t Testable, outputFile string) {
+	t.Helper()
 	t.Cleanup(CaptureMain(mockFile(t, outputFile)))
 }

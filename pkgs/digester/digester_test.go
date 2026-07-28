@@ -24,50 +24,67 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func cleanSetup() {
-	k3s.UnsetHelmBinary()
-	k3s.UnsetHelmBinaryEnv()
-}
+func cleanSetup() {}
 
-func TestDigestK3S(t *testing.T) { //test
-	defer test.ReportErr(t)
-	cleanSetup()
-	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
-	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
-	//runhelpers.Capture(t, "tests/run-*.json")
-	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
-	eh.Check(digester.CreateDigests(tempFile))
-	content := eh.Try(os.ReadFile(tempFile))
-	re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
-	matches := re.FindAll(content, -1)
-	assert.Equal(t, 10, len(matches))
-	fmt.Printf("content:\n%s\n", content)
-}
+func TestDigest(t *testing.T) {
+	type ass = *assert.Assertions
+	type req = *require.Assertions
+	type testFn = func(t *testing.T, assert ass, require req)
+	runner := func(auto bool, capture bool, testFn testFn) func(t *testing.T) {
+		return func(t *testing.T) {
+			defer test.ReportErr(t)
+			k3s.UnsetHelmBinary()
+			k3s.UnsetHelmBinaryEnv()
+			images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+			const fileTemplate = "tests/run-*.json"
+			if auto {
+				runhelpers.CaptureOrRunScript(t, fileTemplate, runhelpers.ArgsCompare)
+			} else if capture {
+				runhelpers.Capture(t, fileTemplate)
+			} else {
+				runhelpers.ScriptTmpArgs(t, fileTemplate)
+			}
 
-func TestDigestK3SPatch(t *testing.T) {
-	defer test.ReportErr(t)
-	cleanSetup()
-	tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
-	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
-	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
-	eh.Check(digester.CreateDigests(tempDir.First(),
-		digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
-	content := eh.Try(os.ReadFile(tempDir.First()))
-	re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
-	matches := re.FindAll(content, -1)
-	assert.Equal(t, 10, len(matches))
-	fmt.Printf("content:\n%s\n", content)
+			testFn(t, assert.New(t), require.New(t))
+		}
+	}
+
+	run := func(testFn testFn) func(*testing.T) { return runner(true, false, testFn) }
+	// runCapture := func(testFn testFn) func(*testing.T) { return runner(false, true, testFn) }
+
+	t.Run("test K3S chart expansion", run(func(t *testing.T, assert ass, request req) {
+		tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
+		eh.Check(digester.CreateDigests(tempFile))
+		content := eh.Try(os.ReadFile(tempFile))
+		re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
+		matches := re.FindAll(content, -1)
+		assert.Equal(10, len(matches))
+		fmt.Printf("content:\n%s\n", content)
+	}))
+
+	t.Run("test K3S chart expansion with patch update method", run(func(t *testing.T, assert ass, request req) {
+		tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
+		images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+		eh.Check(digester.CreateDigests(tempDir.First(),
+			digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
+		content := eh.Try(os.ReadFile(tempDir.First()))
+		re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
+		matches := re.FindAll(content, -1)
+		assert.Equal(10, len(matches))
+		fmt.Printf("content:\n%s\n", content)
+	}))
+
+	t.Run("test K3S chart expansion with verfication", run(func(t *testing.T, assert ass, request req) {
+		tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
+		err := digester.VerifyDigests(tempFile)
+		assert.ErrorIs(err, images.ErrNoDigest)
+		fmt.Printf("%v\n", err)
+	}))
 }
 
 func TestDigestVerifyK3S(t *testing.T) {
 	defer test.ReportErr(t)
 	cleanSetup()
-	tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
-	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
-	runhelpers.ScriptTmpArgs(t, "tests/run-*.json")
-	err := digester.VerifyDigests(tempFile)
-	assert.ErrorIs(t, err, images.ErrNoDigest)
-	fmt.Printf("%v\n", err)
 }
 
 func TestDigestKube(t *testing.T) {

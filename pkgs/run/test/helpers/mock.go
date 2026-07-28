@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"slices"
-	"strings"
 
 	"github.com/robdavid/img-pin/pkgs/run"
 )
@@ -35,6 +34,7 @@ type Testable interface {
 	Cleanup(func())
 	Name() string
 	Fatal(args ...any)
+	Helper()
 }
 
 type ArgEqual = func(args1, args2 []string, index int) bool
@@ -89,8 +89,9 @@ func ArgsCompare(args1, args2 []string, index int) bool {
 }
 
 func Script(t Testable, filename string, compare ArgEqual) {
+	t.Helper()
 	ms := MockState{EqualFunc: compare}
-	fname := strings.Replace(filename, "*", t.Name(), 1)
+	fname := mockFile(t, filename)
 	if err := ms.LoadResponses(fname); err != nil {
 		t.Fatal(err)
 	}
@@ -99,5 +100,18 @@ func Script(t Testable, filename string, compare ArgEqual) {
 }
 
 func ScriptTmpArgs(t Testable, filename string) {
+	t.Helper()
 	Script(t, filename, ArgsCompare)
+}
+
+func CaptureOrRunScript(t Testable, outputFile string, compare ArgEqual) {
+	file := mockFile(t, outputFile)
+	_, err := os.Stat(file)
+	if err == nil {
+		Script(t, file, compare)
+	} else if errors.Is(err, os.ErrNotExist) {
+		Capture(t, file)
+	} else {
+		panic(err)
+	}
 }
