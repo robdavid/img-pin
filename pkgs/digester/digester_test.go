@@ -30,26 +30,22 @@ func TestDigest(t *testing.T) {
 	type ass = *assert.Assertions
 	type req = *require.Assertions
 	type testFn = func(t *testing.T, assert ass, require req)
-	runner := func(auto bool, capture bool, testFn testFn) func(t *testing.T) {
+	runner := func(mode runhelpers.ScriptMode, testFn testFn) func(t *testing.T) {
 		return func(t *testing.T) {
 			defer test.ReportErr(t)
 			k3s.UnsetHelmBinary()
 			k3s.UnsetHelmBinaryEnv()
 			images.MockDigest(t, imghelpers.CommonMockDigestFunc)
-			const fileTemplate = "tests/run-*.json"
-			if auto {
-				runhelpers.CaptureOrRunScript(t, fileTemplate, runhelpers.ArgsCompare)
-			} else if capture {
-				runhelpers.Capture(t, fileTemplate)
-			} else {
-				runhelpers.ScriptTmpArgs(t, fileTemplate)
-			}
-
+			runhelpers.Script(t, runhelpers.ScriptOpts{
+				OutputFile: "tests/run-*.json",
+				ArgCompare: runhelpers.ArgsCompare,
+				Mode:       mode,
+			})
 			testFn(t, assert.New(t), require.New(t))
 		}
 	}
 
-	run := func(testFn testFn) func(*testing.T) { return runner(true, false, testFn) }
+	run := func(testFn testFn) func(*testing.T) { return runner(runhelpers.ScriptModeAuto, testFn) }
 	// runCapture := func(testFn testFn) func(*testing.T) { return runner(false, true, testFn) }
 
 	t.Run("test K3S chart modification", run(func(t *testing.T, assert ass, require req) {

@@ -88,30 +88,53 @@ func ArgsCompare(args1, args2 []string, index int) bool {
 	return left == right
 }
 
-func Script(t Testable, filename string, compare ArgEqual) {
+type ScriptMode int
+
+const (
+	ScriptModeRun ScriptMode = iota
+	ScriptModeCapture
+	ScriptModeEmpty
+	ScriptModeAuto
+)
+
+type ScriptOpts struct {
+	Mode       ScriptMode
+	ArgCompare ArgEqual
+	OutputFile string
+}
+
+func Script(t Testable, opts ScriptOpts) {
 	t.Helper()
-	ms := MockState{EqualFunc: compare}
-	fname := mockFile(t, filename)
-	if err := ms.LoadResponses(fname); err != nil {
-		t.Fatal(err)
+	file := mockFile(t, opts.OutputFile)
+	mode := opts.Mode
+	var cleanup func()
+	for {
+		ms := MockState{EqualFunc: opts.ArgCompare}
+		switch mode {
+		case ScriptModeAuto:
+			_, err := os.Stat(file)
+			if err == nil {
+				mode = ScriptModeRun
+			} else if errors.Is(err, os.ErrNotExist) {
+				mode = ScriptModeCapture
+			} else {
+				panic(err)
+			}
+			continue
+		case ScriptModeRun:
+			fname := mockFile(t, opts.OutputFile)
+			if err := ms.LoadResponses(fname); err != nil {
+				t.Fatal(err)
+			}
+			fallthrough
+		case ScriptModeEmpty:
+			cleanup = run.SetRun(ms.Run)
+		case ScriptModeCapture:
+			cleanup = CaptureMain(file)
+		}
+		break
 	}
-	cleanup := run.SetRun(ms.Run)
-	t.Cleanup(cleanup)
-}
-
-func ScriptTmpArgs(t Testable, filename string) {
-	t.Helper()
-	Script(t, filename, ArgsCompare)
-}
-
-func CaptureOrRunScript(t Testable, outputFile string, compare ArgEqual) {
-	file := mockFile(t, outputFile)
-	_, err := os.Stat(file)
-	if err == nil {
-		Script(t, file, compare)
-	} else if errors.Is(err, os.ErrNotExist) {
-		Capture(t, file)
-	} else {
-		panic(err)
+	if cleanup != nil {
+		t.Cleanup(cleanup)
 	}
 }
