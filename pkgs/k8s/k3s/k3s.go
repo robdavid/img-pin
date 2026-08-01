@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
-	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/skipping"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
 	"github.com/robdavid/img-pin/pkgs/k8s"
 	"github.com/robdavid/img-pin/pkgs/k8s/kube"
+	k8stypes "github.com/robdavid/img-pin/pkgs/k8s/types"
 	"github.com/robdavid/img-pin/pkgs/run"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"go.yaml.in/yaml/v3"
@@ -40,55 +40,12 @@ var K3S_HELM_CHART yu.Signature = yu.Signature{
 }
 
 var (
-	envHelmBinary = "IMG_PIN_HELM"
-	helmBinary    opt.Val[string]
-	helmVersion   opt.Val[string]
+	//envHelmBinary  = "IMG_PIN_HELM"
+	HelmBinary = k8stypes.HelmOpt{EnvOpt: k8stypes.EnvOpt{Env: "IMG_PIN_HELM", DefaultValue: "helm"}}
 )
 
-func SetHelmBinaryEnv(env string) {
-	envHelmBinary = env
-	helmBinary.Unset()
-	helmVersion.Unset()
-}
-
-func UnsetHelmBinary() {
-	helmBinary.Unset()
-	helmVersion.Unset()
-}
-
-func UnsetHelmBinaryEnv() {
-	os.Unsetenv(envHelmBinary)
-}
-
-func HelmBinary() string {
-	var helm string
-	var ok bool
-	if helm, ok = helmBinary.GetOK(); !ok {
-		if helm = os.Getenv(envHelmBinary); helm == "" {
-			helm = DefaultHelmBinary
-		}
-		helmBinary.Set(helm)
-		slog := slog.With("helm", helm)
-		if version, err := run.Run(helm, "version", "--short"); err != nil {
-			slog.Warn("Cannot determine version of '{{.helm}}': {{.err}}", "err", err.Error())
-			helmVersion.Unset()
-		} else {
-			helmVersion.Set(strings.TrimSpace(string(version)))
-		}
-		slog.Debug(`Using helm binary "{{.helm}} version {{.version}}"`, "version", helmVersion.GetOr("unknown"))
-	}
-	return helm
-}
-
-func HelmVersion() opt.Val[string] {
-	if helmBinary.IsEmpty() {
-		HelmBinary()
-	}
-	return helmVersion
-}
-
 func HelmVersionAtLeast(version string) bool {
-	return semver.Compare(HelmVersion().GetOr("v0"), version) >= 0
+	return semver.Compare(HelmBinary.Version().GetOr("v0"), version) >= 0
 }
 
 // HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
@@ -156,7 +113,7 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	Check(encoder.Encode(hc.values))
 	Check(encoder.Close())
 	fh.Close()
-	helmCommand := []string{HelmBinary(), "template", hc.options.InstanceName, hc.options.ChartName, "--values", fh.Name()}
+	helmCommand := []string{HelmBinary.Value(), "template", hc.options.InstanceName, hc.options.ChartName, "--values", fh.Name()}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}
@@ -182,7 +139,7 @@ func (hc *HelmChartDeployment) DefaultValues() (root *yaml.Node, err error) {
 		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
 		return
 	}
-	helmCommand := []string{HelmBinary(), "show", "values", hc.options.ChartName}
+	helmCommand := []string{HelmBinary.Value(), "show", "values", hc.options.ChartName}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}
@@ -212,7 +169,7 @@ func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 	}
 	tmpDir := Try(os.MkdirTemp("", "tmp-img-pin-helm-*"))
 	defer os.RemoveAll(tmpDir)
-	helmCommand := []string{HelmBinary(), "fetch", "--untar", "--untardir", tmpDir, chartName.Chart}
+	helmCommand := []string{HelmBinary.Value(), "fetch", "--untar", "--untardir", tmpDir, chartName.Chart}
 	if hc.options.Version != "" {
 		helmCommand = append(helmCommand, "--version", hc.options.Version)
 	}

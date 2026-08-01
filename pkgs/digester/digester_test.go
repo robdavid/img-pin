@@ -17,6 +17,7 @@ import (
 	"github.com/robdavid/img-pin/pkgs/internal/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/k3s"
+	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/workload"
 	runhelpers "github.com/robdavid/img-pin/pkgs/run/test/helpers"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
@@ -24,17 +25,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func cleanSetup() {}
-
 func TestDigest(t *testing.T) {
 	type ass = *assert.Assertions
 	type req = *require.Assertions
 	type testFn = func(t *testing.T, assert ass, require req)
-	runner := func(mode runhelpers.ScriptMode, testFn testFn) func(t *testing.T) {
+	runner := func(mode runhelpers.ScriptMode, kubeVersion string, testFn testFn) func(t *testing.T) {
 		return func(t *testing.T) {
 			defer test.ReportErr(t)
-			k3s.UnsetHelmBinary()
-			k3s.UnsetHelmBinaryEnv()
+			k3s.HelmBinary.Unset()
+			kube.KubeVersion.Unset()
+			os.Setenv(kube.KubeVersion.Env, kubeVersion)
+			defer os.Unsetenv(kube.KubeVersion.Env)
 			images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 			runhelpers.Script(t, runhelpers.ScriptOpts{
 				OutputFile: "tests/run-*.json",
@@ -45,13 +46,16 @@ func TestDigest(t *testing.T) {
 		}
 	}
 
-	run := func(testFn testFn) func(*testing.T) { return runner(runhelpers.ScriptModeAuto, testFn) }
+	run := func(testFn testFn) func(*testing.T) { return runner(runhelpers.ScriptModeAuto, "", testFn) }
+	runKube := func(kubeVersion string, testFn testFn) func(*testing.T) {
+		return runner(runhelpers.ScriptModeAuto, kubeVersion, testFn)
+	}
 	// runCapture := func(testFn testFn) func(*testing.T) { return runner(false, true, testFn) }
 
 	t.Run("test K3S chart modification", run(func(t *testing.T, assert ass, require req) {
 		tempFile := helpers.CopyToTemp(t, "tests/harbor.yaml")
 		eh.Check(digester.CreateDigests(tempFile))
-		content := eh.Try(os.ReadFile(tempFile))
+		content := test.Result(os.ReadFile(tempFile)).Must(t)
 		re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
 		matches := re.FindAll(content, -1)
 		assert.Equal(10, len(matches))
@@ -63,7 +67,7 @@ func TestDigest(t *testing.T) {
 		images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 		eh.Check(digester.CreateDigests(tempDir.First(),
 			digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
-		content := eh.Try(os.ReadFile(tempDir.First()))
+		content := test.Result(os.ReadFile(tempDir.First())).Must(t)
 		re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
 		matches := re.FindAll(content, -1)
 		assert.Equal(10, len(matches))
@@ -77,9 +81,9 @@ func TestDigest(t *testing.T) {
 		fmt.Printf("%v\n", err)
 	}))
 
-	t.Run("test K3S chart expansion", run(func(t *testing.T, assert ass, require req) {
+	testExpansion := func(t *testing.T, assert ass, require req) {
 		tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
-		dig := eh.Try(digester.DigestKube(tempDir.First(), digester.UseLockfile))
+		dig := test.Result(digester.DigestKube(tempDir.First(), digester.UseLockfile)).Must(t)
 		assert.Greater(len(dig.Resources), 30)
 		var buffer bytes.Buffer
 		eh.Check(digester.WriteCombinedDigests([]*digester.Digester{dig}, &buffer))
@@ -89,21 +93,24 @@ func TestDigest(t *testing.T) {
 		reImg := regexp.MustCompile(`image:`)
 		matches = reImg.FindAll(buffer.Bytes(), -1)
 		assert.Equal(9, len(matches))
-	}))
+	}
+
+	t.Run("test K3S chart expansion", run(testExpansion))
+	t.Run("test K3S chart expansion with kubeconfig", runKube("1.36", testExpansion))
 
 	t.Run("test K3S chart expansion with resource list", run(func(t *testing.T, assert ass, require req) {
 		tempFile := helpers.CopyToTemp(t, "tests/akri.yaml")
-		dig := eh.Try(digester.DigestKube(tempFile))
+		dig := test.Result(digester.DigestKube(tempFile)).Must(t)
 		digester.WriteCombinedDigests([]*digester.Digester{dig}, os.Stdout)
 		assert.Greater(len(dig.Resources), 19)
 	}))
 
 	t.Run("test K3S chart modify gatekeeper", run(func(t *testing.T, assert ass, require req) {
 		tempFile := helpers.CopyToTemp(t, "tests/opag.yaml")
-		eh.Check(digester.CreateDigests(tempFile))
-		content := eh.Try(os.ReadFile(tempFile))
+		test.Result0(digester.CreateDigests(tempFile)).Must(t)
+		content := test.Result(os.ReadFile(tempFile)).Must(t)
 		buf := bytes.NewBuffer(content)
-		docs := eh.Try(yu.StreamDocsIn(buf))
+		docs := test.Result(yu.StreamDocsIn(buf)).Must(t)
 		require.Equal(5, len(docs))
 		image := yu.Get[string](docs[4], "spec", "template", "spec", "containers", 0, "image")
 		assert.Contains(image.GetOr(""), "@sha256:")

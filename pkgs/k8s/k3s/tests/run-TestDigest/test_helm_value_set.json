@@ -2,14 +2,6 @@
   {
     "cmdAndArgs": [
       "helm",
-      "version",
-      "--short"
-    ],
-    "response": "v4.2.3\n"
-  },
-  {
-    "cmdAndArgs": [
-      "helm",
       "show",
       "values",
       "../../k8s/tests/charts/nginx-ingress",

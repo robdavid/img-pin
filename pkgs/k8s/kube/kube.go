@@ -5,13 +5,19 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/robdavid/img-pin/pkgs/k8s/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
+var KubeVersion = types.EnvOpt{Env: "IMG_PIN_KUBE_VERSION"}
+
 func GetClusterVersion() (string, error) {
+	if version, ok := KubeVersion.Opt().GetOK(); ok {
+		return version, nil
+	}
 	prev := klog.Background()
 	klog.SetLogger(logr.Discard())
 	defer klog.SetLogger(prev)

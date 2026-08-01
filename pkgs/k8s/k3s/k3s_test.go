@@ -51,8 +51,7 @@ func TestDigest(t *testing.T) {
 	runner := func(mode runhelpers.ScriptMode, testFn testFn) func(t *testing.T) {
 		return func(t *testing.T) {
 			defer test.ReportErr(t)
-			k3s.UnsetHelmBinary()
-			k3s.UnsetHelmBinaryEnv()
+			k3s.HelmBinary.Unset()
 			images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 			runhelpers.Script(t, runhelpers.ScriptOpts{
 				OutputFile: "tests/run-*.json",
@@ -151,31 +150,31 @@ func TestDigest(t *testing.T) {
 	}))
 
 	t.Run("helm version", run(func(t *testing.T, assert ass, require req) {
-		assert.True(k3s.HelmVersionAtLeast("v2"), "unexpected helm version %q", k3s.HelmVersion())
-		assert.False(k3s.HelmVersionAtLeast("v99"), "unexpected helm version %q", k3s.HelmVersion())
+		assert.True(k3s.HelmVersionAtLeast("v2"), "unexpected helm version %q", k3s.HelmBinary.Version())
+		assert.False(k3s.HelmVersionAtLeast("v99"), "unexpected helm version %q", k3s.HelmBinary.Version())
 	}))
 }
 
 func TestHelmBinary(t *testing.T) {
 
-	const envName = "IMG_PIN_HELM"
+	const envName = "IMG_PIN_HELM_TEST"
 
-	defer k3s.UnsetHelmBinary()
+	defer k3s.HelmBinary.Unset()
 
 	t.Run("with default binary", func(t *testing.T) {
-		k3s.SetHelmBinaryEnv(envName)
+		k3s.HelmBinary.SetEnv(envName)
 		os.Unsetenv(envName)
 		for range 2 {
-			assert.Equal(t, "helm", k3s.HelmBinary())
+			assert.Equal(t, "helm", k3s.HelmBinary.Value())
 		}
 	})
 
 	t.Run("with specific binary", func(t *testing.T) {
-		k3s.SetHelmBinaryEnv(envName)
+		k3s.HelmBinary.SetEnv(envName)
 		os.Setenv(envName, "helm4")
 		defer os.Unsetenv(envName)
 		for range 2 {
-			assert.Equal(t, "helm4", k3s.HelmBinary())
+			assert.Equal(t, "helm4", k3s.HelmBinary.Value())
 		}
 	})
 
