@@ -15,10 +15,9 @@ func CopyToTemp(t *testing.T, filename string) string {
 	})
 	src := Try(os.Open(filename))
 	defer src.Close()
-	dir := filepath.Dir(filename)
 	name := filepath.Base(filename)
 	ext := filepath.Ext(name)
-	dst := Try(os.CreateTemp(dir, name[:len(name)-len(ext)]+"-*.tmp"+ext))
+	dst := Try(os.CreateTemp("", name[:len(name)-len(ext)]+"-*.tmp"+ext))
 	defer dst.Close()
 	t.Cleanup(func() { os.Remove(dst.Name()) })
 	Try(io.Copy(dst, src))
@@ -44,8 +43,7 @@ func CopyToTempDir(t *testing.T, filenames ...string) (tmpDir TempDir) {
 	if len(filenames) == 0 {
 		t.Fatal("No file names supplied to CopyToTemp")
 	}
-	dir := filepath.Dir(filenames[0])
-	tmpDir.Dir = Try(os.MkdirTemp(dir, "tmp-*"))
+	tmpDir.Dir = Try(os.MkdirTemp("", "tmp-*"))
 	t.Cleanup(func() { tmpDir.Delete() })
 	for _, filename := range filenames {
 		src := Try(os.Open(filename))

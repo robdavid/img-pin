@@ -1,5 +1,5 @@
 {
-  description = "Development shell with Helm";
+  description = "img-pin package and development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,6 +11,20 @@
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in
     {
+      packages = forAllSystems (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          default = pkgs.buildGoModule {
+            pname = "img-pin";
+            version = "0.0.0";
+            src = self;
+            vendorHash = "sha256-jDwJG59Q/TA0tSfpm0FDBWFyWwDb7xRqCnuBRlaKP6c=";
+            checkFlags = [ "-short" ];
+          };
+        }
+      );
       devShells = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};

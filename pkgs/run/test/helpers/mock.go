@@ -71,7 +71,7 @@ func (ms *MockState) LoadResponses(filename string) error {
 	return decoder.Decode(&ms.Responses)
 }
 
-var reTempFile = regexp.MustCompile(`^/tmp/(.*)-[0-9]+.(json|yaml)$`)
+var reTempFile = regexp.MustCompile(`^.*/(.*)-[0-9]+\.(json|yaml)$`)
 
 func ArgsCompare(args1, args2 []string, index int) bool {
 	left := args1[index]

@@ -6,3 +6,4 @@ nexus.yaml
 .sessions/
 coverage.out
 .direnv/
+result
