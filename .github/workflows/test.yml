@@ -1,0 +1,16 @@
+name: test
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - name: Run tests in dev shell
+        run: nix develop --command go test -short ./...
+      - name: Build package (with sandboxed tests)
+        run: nix build .

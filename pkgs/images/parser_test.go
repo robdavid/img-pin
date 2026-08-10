@@ -6,13 +6,20 @@ import (
 	. "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/img-pin/pkgs/images"
+	"github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+const vaultTag = "1.13.3"
+const oldVaultTag = "1.13.2"
+const vaultDigest = "sha256:5eba321fbeb624163a45c1aee5379caf6ec16fe6f644cc89f203a209eafba5eb"
+const oldVaultDigest = "sha256:c186e9bff2db0bd61dad70e7733cbfa5a0f8ddee3a6a061f3753060689aa81ab"
+
 func TestParseImage(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	img, err := images.Parse("ubuntu:24.04")
 	require.NoError(err)
 	assert.Equal("docker.io", img.Registry)
@@ -46,6 +53,7 @@ func TestParseImage(t *testing.T) {
 func TestSetDigestNoTag(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	img, err := images.Parse("ubuntu:24.04")
 	require.NoError(err)
 	assert.Empty(img.Digest)
@@ -59,6 +67,7 @@ func TestSetDigestNoTag(t *testing.T) {
 func TestSetDigestWithTag(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	img, err := images.Parse("ubuntu:24.04")
 	require.NoError(err)
 	assert.Empty(img.Digest)
@@ -72,6 +81,7 @@ func TestSetDigestWithTag(t *testing.T) {
 func TestVerifyParsedImage(t *testing.T) {
 	test.ReportErr(t)
 	assert := assert.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	err := Try(images.Parse("hashicorp/vault:" + vaultTag + "@" + vaultDigest)).VerifyDigest()
 	assert.NoError(err)
 	err = Try(images.Parse("hashicorp/vault:" + vaultTag + "@" + vaultDigest)).VerifyDigest(images.ExpectDigest(vaultDigest))
@@ -93,6 +103,7 @@ func TestVerifyParsedImage(t *testing.T) {
 func TestUpdateParsedDigest(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
+	images.MockDigest(t, helpers.CommonMockDigestFunc)
 	image := Try(images.Parse("hashicorp/vault:" + vaultTag + "@" + oldVaultDigest))
 	err := image.UpdateDigest(images.IncludeTag)
 	require.NoError(err)

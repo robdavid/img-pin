@@ -9,6 +9,7 @@ import (
 
 	"github.com/robdavid/img-pin/pkgs/dockerfile"
 	"github.com/robdavid/img-pin/pkgs/images"
+	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,6 +17,7 @@ import (
 func TestScanForImages(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	input := `FROM ubuntu:24.04
 RUN echo "Hello, world!"
 FROM alpine:3.18`
@@ -31,6 +33,7 @@ FROM alpine:3.18`
 func TestLockImages(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	input := `FROM ubuntu:24.04
 RUN echo "Hello, world!"
 FROM alpine:3.18`
@@ -48,6 +51,7 @@ FROM alpine:3.18`
 func TestLockImagesSyntaxVariations(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	input := `FROM --platform=linux/amd64 ubuntu:24.04
 RUN echo "Hello, world!"
 FROM alpine:3.18 AS builder`
@@ -65,6 +69,7 @@ FROM alpine:3.18 AS builder`
 func TestPatch(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 
 	content := "FROM ubuntu:24.04\nRUN echo \"Hello, world!\"\nFROM alpine:3.18\n"
 	dir := t.TempDir()
@@ -89,6 +94,7 @@ func TestPatch(t *testing.T) {
 func TestPatchWithFailedVerifyOnly(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 
 	content := "FROM ubuntu:24.04\nRUN echo \"Hello, world!\"\nFROM alpine:3.18\n"
 	dir := t.TempDir()
@@ -113,6 +119,7 @@ func TestPatchWithFailedVerifyOnly(t *testing.T) {
 func TestPatchWithSuccessfulVerifyOnly(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 
 	content := "FROM ubuntu:24.04\nRUN echo \"Hello, world!\"\nFROM alpine:3.18\n"
 	dir := t.TempDir()
@@ -143,6 +150,8 @@ func TestPatchWithSuccessfulVerifyOnly(t *testing.T) {
 func TestV1SchemaDigestNoSkip(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+
 	const content = `FROM quay.io/dexidp/dex:v2.14.0
 CMD "dex"
 `
@@ -156,6 +165,8 @@ CMD "dex"
 func TestV1SchemaDigestSkip(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+
 	const content = `FROM quay.io/dexidp/dex:v2.14.0
 CMD "dex"
 `

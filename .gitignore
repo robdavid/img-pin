@@ -5,3 +5,5 @@ nexus.yaml
 *.tmp.yaml
 .sessions/
 coverage.out
+.direnv/
+result

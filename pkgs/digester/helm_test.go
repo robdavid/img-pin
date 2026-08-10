@@ -8,6 +8,8 @@ import (
 	"github.com/robdavid/genutil-go/errors/test"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/img-pin/pkgs/digester"
+	"github.com/robdavid/img-pin/pkgs/images"
+	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"go.yaml.in/yaml/v3"
 )
@@ -15,6 +17,7 @@ import (
 func TestValuesSearch(t *testing.T) {
 	defer test.ReportErr(t)
 	assert := assert.New(t)
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 	var values yaml.Node
 	valuesText := Try(os.ReadFile("tests/test_values.yaml"))
 	Check(yaml.Unmarshal(valuesText, &values))
