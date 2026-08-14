@@ -18,9 +18,9 @@
         {
           default = pkgs.buildGoModule {
             pname = "img-pin";
-            version = "0.0.0";
+            version = "0.3.1";
             src = self;
-            vendorHash = "sha256-jDwJG59Q/TA0tSfpm0FDBWFyWwDb7xRqCnuBRlaKP6c=";
+            vendorHash = "sha256-mLyeM7BxRlhT6LlNU0haE41ss4MXFhUO9T5c1b8cULU=";
             checkFlags = [ "-short" ];
           };
         }
@@ -35,6 +35,7 @@
               go
               gopls
               delve
+              govulncheck
               kubernetes-helm
               docker-client
               bashInteractive # https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
