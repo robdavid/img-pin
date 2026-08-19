@@ -94,20 +94,28 @@ func (ml MatchList) Match(img *Image) bool {
 	return false
 }
 
+// MappingMatch finds a match in a map of [ImagePart] keys to am image. Matches include,
+// an exact match, a match without a tag, a match without a repository and tag (but with a group),
+// a match without group, repository and tag, and a match on registry only.
+func MappingMatch[T any](mapping map[ImageParts]T, img *Image) (value T, ok bool) {
+	key := MakeImageParts(img)
+	for {
+		if value, ok = mapping[key]; ok {
+			return
+		} else if !key.Truncate() {
+			break
+		}
+	}
+	return
+}
+
 func MapperPolicy(mapping map[ImageParts]ImageParts, fallback bool) Policy {
 	return func(pol *PolicyContext) error {
 		img := pol.Image
-		key := MakeImageParts(img)
-		for {
-			if replacement, ok := mapping[key]; ok {
-				replacement.UpdateImage(img)
-				if fallback {
-					pol.FallbackImage = pol.Image.Clone()
-				}
-				break
-			}
-			if !key.Truncate() {
-				break
+		if replacement, ok := MappingMatch(mapping, img); ok {
+			replacement.UpdateImage(img)
+			if fallback {
+				pol.FallbackImage = pol.Image.Clone()
 			}
 		}
 		return nil
@@ -127,11 +135,33 @@ func DockerToAWS(imageNames ...string) map[ImageParts]ImageParts {
 	return mapping
 }
 
+// DefaultAgeByNamePolicy creates a minimum age policy based on mappings from
+// image name (without) any "group" prefix to a minimum age ([time.Duration]).
+// The applied policy is a default age policy pre-pended to the start of other
+// image options, with the first default policy having the highest priority over
+// other default policies. Any user supplied age option will override the
+// defaults.
 func DefaultAgeByNamePolicy(table map[string]time.Duration) Policy {
 	return func(pol *PolicyContext) error {
 		img := pol.Image
 		_, name := img.GroupAndName()
 		if age, ok := table[name]; ok {
+			*pol.Options = append(slices.New(MinimumAge(age)), *pol.Options...)
+		}
+		return nil
+	}
+}
+
+// DefaultAgeMapperPolicy creates a minimum age policy based on mappings from
+// matching image parts to a minimum age ([time.Duration]). Images are matched
+// to [ImageParts] by the rules of [MappingMatch]. The applied policy is a
+// default age policy pre-pended to the start of other image options, with the
+// first default policy having the highest priority over other default policies.
+// Any user supplied age option will override the defaults.
+func DefaultAgeMapperPolicy(mapping map[ImageParts]time.Duration) Policy {
+	return func(pol *PolicyContext) error {
+		img := pol.Image
+		if age, ok := MappingMatch(mapping, img); ok {
 			*pol.Options = append(slices.New(MinimumAge(age)), *pol.Options...)
 		}
 		return nil
