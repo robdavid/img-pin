@@ -18,7 +18,7 @@
         {
           default = pkgs.buildGoModule {
             pname = "img-pin";
-            version = "0.3.1";
+            version = "0.4.0";
             src = self;
             vendorHash = "sha256-mLyeM7BxRlhT6LlNU0haE41ss4MXFhUO9T5c1b8cULU=";
             checkFlags = [ "-short" ];
@@ -39,6 +39,8 @@
               kubernetes-helm
               docker-client
               bashInteractive # https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
+              nixd
+              nil
             ];
             hardeningDisable = [ "fortify" ];
           };

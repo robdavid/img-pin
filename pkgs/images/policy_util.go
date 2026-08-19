@@ -94,20 +94,28 @@ func (ml MatchList) Match(img *Image) bool {
 	return false
 }
 
+// MappingMatch finds a match in a map of [ImagePart] keys to am image. Matches include,
+// an exact match, a match without a tag, a match without a repository and tag (but with a group),
+// a match without group, repository and tag, and a match on registry only.
+func MappingMatch[T any](mapping map[ImageParts]T, img *Image) (value T, ok bool) {
+	key := MakeImageParts(img)
+	for {
+		if value, ok = mapping[key]; ok {
+			return
+		} else if !key.Truncate() {
+			break
+		}
+	}
+	return
+}
+
 func MapperPolicy(mapping map[ImageParts]ImageParts, fallback bool) Policy {
 	return func(pol *PolicyContext) error {
 		img := pol.Image
-		key := MakeImageParts(img)
-		for {
-			if replacement, ok := mapping[key]; ok {
-				replacement.UpdateImage(img)
-				if fallback {
-					pol.FallbackImage = pol.Image.Clone()
-				}
-				break
-			}
-			if !key.Truncate() {
-				break
+		if replacement, ok := MappingMatch(mapping, img); ok {
+			replacement.UpdateImage(img)
+			if fallback {
+				pol.FallbackImage = pol.Image.Clone()
 			}
 		}
 		return nil
@@ -132,6 +140,16 @@ func DefaultAgeByNamePolicy(table map[string]time.Duration) Policy {
 		img := pol.Image
 		_, name := img.GroupAndName()
 		if age, ok := table[name]; ok {
+			*pol.Options = append(slices.New(MinimumAge(age)), *pol.Options...)
+		}
+		return nil
+	}
+}
+
+func DefaultAgeMapperPolicy(mapping map[ImageParts]time.Duration) Policy {
+	return func(pol *PolicyContext) error {
+		img := pol.Image
+		if age, ok := MappingMatch(mapping, img); ok {
 			*pol.Options = append(slices.New(MinimumAge(age)), *pol.Options...)
 		}
 		return nil
