@@ -135,6 +135,12 @@ func DockerToAWS(imageNames ...string) map[ImageParts]ImageParts {
 	return mapping
 }
 
+// DefaultAgeByNamePolicy creates a minimum age policy based on mappings from
+// image name (without) any "group" prefix to a minimum age ([time.Duration]).
+// The applied policy is a default age policy pre-pended to the start of other
+// image options, with the first default policy having the highest priority over
+// other default policies. Any user supplied age option will override the
+// defaults.
 func DefaultAgeByNamePolicy(table map[string]time.Duration) Policy {
 	return func(pol *PolicyContext) error {
 		img := pol.Image
@@ -146,6 +152,12 @@ func DefaultAgeByNamePolicy(table map[string]time.Duration) Policy {
 	}
 }
 
+// DefaultAgeMapperPolicy creates a minimum age policy based on mappings from
+// matching image parts to a minimum age ([time.Duration]). Images are matched
+// to [ImageParts] by the rules of [MappingMatch]. The applied policy is a
+// default age policy pre-pended to the start of other image options, with the
+// first default policy having the highest priority over other default policies.
+// Any user supplied age option will override the defaults.
 func DefaultAgeMapperPolicy(mapping map[ImageParts]time.Duration) Policy {
 	return func(pol *PolicyContext) error {
 		img := pol.Image
