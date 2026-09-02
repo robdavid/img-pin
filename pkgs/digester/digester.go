@@ -229,20 +229,34 @@ func (ky *Digester) configureLockfile() error {
 	return nil
 }
 
+// Loads the [Digester] from a YAML document file
 func (ky *Digester) LoadFile(filename string) (err error) {
 	defer Catch(&err)
 	ky.Filename = filename
 	Check(ky.configureLockfile())
 	if filename == "-" {
-		Check(ky.Read(os.Stdin))
+		Check(ky.read(os.Stdin))
 	} else {
 		input := Try(os.Open(filename))
 		defer input.Close()
-		Check(ky.Read(input))
+		Check(ky.read(input))
 	}
 	return
 }
 
+// Loads the [Digester] from a YAML document provided by an [io.Reader] stream.
+func (ky *Digester) LoadStream(input io.Reader) (err error) {
+	defer Catch(&err)
+	ky.Filename = "(stream)"
+	if ky.options.lockFileName != "" {
+		Check(ky.configureLockfile())
+	}
+	Check(ky.read(input))
+	return
+}
+
+// Writes the contents of the associated lock file, if any, updating
+// it with the most recent lock values.
 func (ky *Digester) WriteAnyLocks() error {
 	if ky.lockfile != nil && ky.options.generateLocks {
 		return ky.lockfile.Save()
@@ -250,7 +264,7 @@ func (ky *Digester) WriteAnyLocks() error {
 	return nil
 }
 
-func (ky *Digester) Read(input io.Reader) (err error) {
+func (ky *Digester) read(input io.Reader) (err error) {
 	if ky.Docs, err = yu.StreamDocsIn(input); err != nil {
 		return
 	}
@@ -306,6 +320,11 @@ func (ky *Digester) ExpandResources() (err error) {
 	return ky.ReadDocs()
 }
 
+// Create digests will iterate over previously identified resources performing the [types.Digest]
+// action on all those resources that support it. For well defined workloads, such as Kubernetes
+// deployments, the image name is replaced by its digest. For resources that process Helm charts
+// (like k3s' HelmChart) an attempt is made to update its image values to produce the required
+// pining image names.
 func (ky *Digester) CreateDigests() (err error) {
 	log := slog.With("file", ky.Filename)
 	for n, r := range ky.Resources {
@@ -366,6 +385,8 @@ func (ky *Digester) WriteFile() (err error) {
 	return nil
 }
 
+// Write write the text of the digested YAML documents to the supplied
+// output [io.Writer].
 func (ky *Digester) Write(output io.Writer) (err error) {
 	defer Catch(&err)
 	docs := slices.Map(ky.Resources, func(r types.Resource) *yaml.Node { return Try(r.Save()) })
@@ -373,6 +394,10 @@ func (ky *Digester) Write(output io.Writer) (err error) {
 	return
 }
 
+// WriteUsingMethod write the text of the digested YAML documents to the
+// supplied output [io.Writer], using a write method that is designed to
+// preserve as much of the original formatting, whitespace and comments as
+// possible.
 func (ky *Digester) WriteUsingMethod(original io.Reader, output io.Writer) (err error) {
 	defer Catch(&err)
 	method := ky.options.updateMethod
@@ -461,7 +486,7 @@ func CreateDigests(filename string, options ...Option) (err error) {
 		verifier := NewVerificationDigester(digester)
 		defer verifier.Cleanup()
 		slog.Debug("{{.file}}: performing verification pass")
-		Check(verifier.Read(&buffer))
+		Check(verifier.read(&buffer))
 		Check(compareDocs(digester.DigestedDocs, verifier.Docs))
 		Check(verifier.VerifyDigests())
 		slog.Info("{{.file}}: round-trip verified {{.ndocs}} docs", "ndocs", len(verifier.Docs))

@@ -103,6 +103,10 @@ type ScriptOpts struct {
 	OutputFile string
 }
 
+// Script is a function that can record and replay executed commands plus
+// arguments, executed via [run.Run], together with responses, in sequence,
+// providing command mocking facilities. It can, for example, record the results
+// of Helm command invocations with specific parameters.
 func Script(t Testable, opts ScriptOpts) {
 	t.Helper()
 	file := mockFile(t, opts.OutputFile)

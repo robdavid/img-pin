@@ -129,4 +129,17 @@ func TestDigest(t *testing.T) {
 		assert.NoError(err)
 		fmt.Println(err)
 	}))
+
+	t.Run("test load digester from stream", run(func(t *testing.T, assert ass, require req) {
+		var output bytes.Buffer
+		fh, err := os.Open("tests/opag.yaml")
+		require.NoError(err)
+		defer fh.Close()
+		dig := digester.NewDigester(digester.ImageOptions(images.IncludeTag))
+		err = dig.LoadStream(fh)
+		require.NoError(err)
+		require.NoError(dig.CreateDigests())
+		require.NoError(dig.Write(&output))
+		assert.Contains(output.String(), "docker.io/openpolicyagent/gatekeeper:dev@sha256:c64a643dd665db62c43aa089432eb2e74b13364c616fc12ca524baead6ccc332")
+	}))
 }
