@@ -48,7 +48,7 @@ func HelmVersionAtLeast(version string) bool {
 	return semver.Compare(HelmBinary.Version().GetOr("v0"), version) >= 0
 }
 
-// HelmChartDeployment is a [Deployment] based on the k3s HelmChart resource
+// HelmChartDeployment is a [types.Deployment] based on the k3s HelmChart resource
 type HelmChartDeployment struct {
 	options     types.HelmOptions
 	kubeVersion string

@@ -140,6 +140,7 @@ func LockFileName(name string) Option {
 // digests. This is useful when only populating a lock file.
 func NoWrite(o *Options) { o.noWrite = true }
 
+// Digester consumes YAML resources and updates any image names with their pinned equivalents.
 type Digester struct {
 	Filename      string
 	options       Options
