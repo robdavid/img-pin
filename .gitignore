@@ -1,9 +1,10 @@
 img-pin
-.vscode/launch.json
+/.vscode/launch.json
 vault.yaml
 nexus.yaml
 *.tmp.yaml
 .sessions/
 coverage.out
-.direnv/
-result
+/.direnv/
+/result
+/vendor
