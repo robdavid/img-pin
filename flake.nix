@@ -20,7 +20,7 @@
             pname = "img-pin";
             version = "0.4.0";
             src = self;
-            vendorHash = "sha256-mLyeM7BxRlhT6LlNU0haE41ss4MXFhUO9T5c1b8cULU=";
+            vendorHash = "sha256-gLbW0Rze9OB0junQI/8dY/4FMNbC9cwlCRQqrtXUZlc=";
             checkFlags = [ "-short" ];
           };
         }
