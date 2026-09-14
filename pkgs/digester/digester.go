@@ -320,7 +320,7 @@ func (ky *Digester) ExpandResources() (err error) {
 	return ky.ReadDocs()
 }
 
-// Create digests will iterate over previously identified resources performing the [types.Digest]
+// CreateDigests will iterate over previously identified resources performing the [types.Digest]
 // action on all those resources that support it. For well defined workloads, such as Kubernetes
 // deployments, the image name is replaced by its digest. For resources that process Helm charts
 // (like k3s' HelmChart) an attempt is made to update its image values to produce the required
@@ -342,6 +342,11 @@ func (ky *Digester) CreateDigests() (err error) {
 	return
 }
 
+// VerifyDigests will iterate over previously identified resources performing the [types.Verify]
+// action on all those resources that support it. Typically this means checking that the image
+// follows policy and if a tag and digest are both present, check the digest is correct. When using
+// a lock file, verify will check that a lookup on the lock file returns an item with a matching
+// name, digest and tag.
 func (ky *Digester) VerifyDigests() (err error) {
 	log := slog.With("file", ky.Filename)
 	for n, r := range ky.Resources {
@@ -355,6 +360,8 @@ func (ky *Digester) VerifyDigests() (err error) {
 	return
 }
 
+// CRDs compiles a list of custom resource definitions provided by each resource. Typically
+// only Helm chart resources will return a CRD.
 func (ky *Digester) CRDs() (crds []*yaml.Node, err error) {
 	for _, resource := range ky.Resources {
 		var docs []*yaml.Node
@@ -366,6 +373,11 @@ func (ky *Digester) CRDs() (crds []*yaml.Node, err error) {
 	return
 }
 
+// WriteFile will write out the set of processed resources, as YAML text, back
+// to the original file. This call only makes sense for operations that mutate
+// resources, e.g. pinning images in Helm chart values. If there is no file name
+// defined in the [Digester], an [ErrNoFileWrite] error is returned. If the file
+// name is "-", the output is written to stdout.
 func (ky *Digester) WriteFile() (err error) {
 	defer Catch(&err)
 	if ky.Filename == "" {
