@@ -26,6 +26,8 @@ type ListYaml struct {
 	Items      []*yaml.Node `yaml:"items"`
 }
 
+// DigesterResource is a [types.Resource] that is backed by a [Digester], used to represent
+// collections of resources, such a list.
 type DigesterResource struct {
 	digester *Digester
 }
@@ -37,7 +39,7 @@ func (dr DigesterResource) Load(doc *yaml.Node) error {
 		return fmt.Errorf("%w: expected %q field", ErrYamlParse, items)
 	}
 	dr.digester.Docs = optNode.Ref().Content
-	return dr.digester.ReadDocs()
+	return dr.digester.readDocs()
 }
 
 func (dr DigesterResource) Save() (*yaml.Node, error) {

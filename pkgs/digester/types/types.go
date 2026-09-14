@@ -25,8 +25,13 @@ const (
 )
 
 type BaseResource interface {
+
+	// Load populates the resource with raw YAML data provided in the doc parameter.
 	Load(doc *yaml.Node) error
+
+	// Save returns YAML data that represents the current state of the resource.
 	Save() (*yaml.Node, error)
+
 	// Performs any necessary cleanup actions after processing.
 	Cleanup() error
 }
@@ -35,15 +40,26 @@ type BaseResource interface {
 type Resource interface {
 	BaseResource
 
+	// CanDigest returns true if the [Resource.Digest] and [Resource.Verify]
+	// methods are supported.
 	CanDigest() bool
+
 	// Digest runs digests over the images in the resource
 	Digest() error
 
 	// Verify checks all digests are present and correct
 	Verify() error
 
+	// Expand returns a list of YAML nodes that represent all the YAML documents
+	// the resource can be expanded into, if it can be so expanded. For example
+	// a Helm will be expanded into YAML documents via the helm template
+	// command. A resource that cannot be expanded simply returns itself as a
+	// YAML node.
 	Expand() ([]*yaml.Node, error)
 
+	// CRDs returns any custom resource definitions associated with this resource, that
+	// are not explicit in the resource itself. This typically applies to Helm charts.
+	// Resources without such definitions will return an empty list (or nil).
 	CRDs() ([]*yaml.Node, error)
 }
 
@@ -56,6 +72,7 @@ type HelmOptions struct {
 	Namespace    string
 }
 
+// Deployment represents a Helm deployment resource (such as a HelmChart).
 type Deployment interface {
 	BaseResource
 

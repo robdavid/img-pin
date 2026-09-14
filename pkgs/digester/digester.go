@@ -264,16 +264,21 @@ func (ky *Digester) WriteAnyLocks() error {
 	return nil
 }
 
+// read reads YAML documents from the supplied input stream, populating the
+// instance's [Digester.Docs] field, before processing them into a list of
+// [types.Resource] via the [Digester.readDocs] method.
 func (ky *Digester) read(input io.Reader) (err error) {
 	if ky.Docs, err = yu.StreamDocsIn(input); err != nil {
 		return
 	}
 	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
 	log.Debug("found {{.ndocs}} document(s) in {{.file}}")
-	return ky.ReadDocs()
+	return ky.readDocs()
 }
 
-func (ky *Digester) ReadDocs() (err error) {
+// readDocs ingests the [Digester.Docs] list of raw YAML documents defined in this instance,
+// identifying and processing them into a list of [types.Resource] items in [Digester.Resources].
+func (ky *Digester) readDocs() (err error) {
 	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
 	ky.Resources = make([]types.Resource, len(ky.Docs))
 nextDoc:
@@ -305,6 +310,8 @@ nextDoc:
 	return
 }
 
+// ExpandResources takes the current set of [Digester.Resources] and expands each, via
+// [types.Resource.Expand]
 func (ky *Digester) ExpandResources() (err error) {
 	newDocs := make([]*yaml.Node, 0, len(ky.Docs))
 	for _, resource := range ky.Resources {
@@ -317,7 +324,7 @@ func (ky *Digester) ExpandResources() (err error) {
 	ky.Docs = newDocs
 	ky.Cleanup()
 
-	return ky.ReadDocs()
+	return ky.readDocs()
 }
 
 // CreateDigests will iterate over previously identified resources performing the [types.Digest]
@@ -427,6 +434,16 @@ func (ky *Digester) WriteUsingMethod(original io.Reader, output io.Writer) (err 
 	return nil
 }
 
+// Cleanup performs cleanup actions. This should be called after all processing
+// is completed. It is recommended that all processing be performed in a
+// function that defers a call to Cleanup.
+//
+//	func processData() {
+//	  dig := NewDigester()
+//	  defer dig.Cleanup()
+//	  // Continue with processing
+//	  // ...
+//	}
 func (ky *Digester) Cleanup() (err error) {
 	for _, doc := range ky.Resources {
 		if doc != nil {
@@ -478,6 +495,10 @@ func compareDocs(ds1 []*yaml.Node, ds2 []*yaml.Node) error {
 	return nil
 }
 
+// CreateDigests is used to patch resources in place, replacing tagged
+// images with digests. If the resources include Helm chart deployments,
+// such as helm.cattle.io HelmChart, and best effort attempt is made to
+// patch chart values that determine image names.
 func CreateDigests(filename string, options ...Option) (err error) {
 	defer Handle(func(e error) {
 		err = fmt.Errorf("%s: %w", filename, e)
@@ -522,6 +543,12 @@ func VerifyDigests(filename string, options ...Option) (err error) {
 	return
 }
 
+// DigestKube is used to expand all resources in the file with the supplied
+// filename, replacing any Helm resources, such as helm.cattle.io HelmChart resources,
+// by the resources the templates resolve into. Any resulting workload resource that
+// contain image names are pinned. The resulting [Digester] containing the pinned
+// [Digester.Resources] is returned. These may be written to an output destination
+// by one of the [Digester] write methods.
 func DigestKube(filename string, options ...Option) (digester *Digester, err error) {
 	defer Handle(func(e error) {
 		err = fmt.Errorf("%s: %w", filename, e)
@@ -538,6 +565,9 @@ func DigestKube(filename string, options ...Option) (digester *Digester, err err
 	return
 }
 
+// FetchCrds will return the raw YAML nodes of any custom resource definitions
+// defined by any of the resources contained in the input file with the supplied
+// filename.
 func FetchCrds(filename string, options ...Option) (crds []*yaml.Node, err error) {
 	defer Handle(func(e error) {
 		err = fmt.Errorf("%s: %w", filename, e)
@@ -551,6 +581,9 @@ func FetchCrds(filename string, options ...Option) (crds []*yaml.Node, err error
 	return
 }
 
+// WriteCombinedDigests takes a list of *[Digester] objects and writes the YAML
+// text of their [Digester.Resources] as a single combined multi-document text
+// to an output stream.
 func WriteCombinedDigests(digests []*Digester, output io.Writer) (err error) {
 	defer Catch(&err)
 	totalLen := slices.Fold(digests, 0, func(total int, digest *Digester) int { return total + len(digest.Resources) })
