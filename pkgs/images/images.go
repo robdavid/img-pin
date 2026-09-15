@@ -189,7 +189,6 @@ func RequestCount(counters map[string]int) ImageOption {
 // was built more recently than the given age. If [SkipTime] is specfied and
 // [MinimumAge] is not specified, the image creation time lookup is skipped, and
 // the returned creation time will be the zero.
-
 func Digest(image string, options ...ImageOption) (digested string, digest string, created time.Time, err error) {
 	defer Catch(&err)
 	var opts ImageOptions

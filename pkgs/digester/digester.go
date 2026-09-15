@@ -22,21 +22,26 @@ import (
 )
 
 var (
+	// ErrUnexpectedResourceType indicates that an unexpected resource type was
+	// encountered.
 	ErrUnexpectedResourceType = errors.New("unexpected resource type encountered")
-	ErrNoFileWrite            = errors.New("cannot write, input is a stream")
-	ErrRoundTrip              = errors.New("output file has not preserved all the data from the input file")
-	ErrLockFileName           = errors.New("no lock file name was provided or could be inferred")
+
+	// ErrNoFileWrite indicates that a file cannot be written because the input
+	// was a stream and not a file.
+	ErrNoFileWrite = errors.New("cannot write, input is a stream")
+
+	// ErrRoundTrip indicates that on verification of output via round tripping,
+	// discrepancies were found.
+	ErrRoundTrip = errors.New("output file has not preserved all the data from the input file")
+
+	// ErrLockFileName indicates that no lock file name was provided, and no
+	// default was available, when writing a lock file.
+	ErrLockFileName = errors.New("no lock file name was provided or could be inferred")
 )
 
-type DeploymentLoader interface {
-	// Filename returns the file path of the file that describes one or
-	// more deployments
-	Filename() string
-
-	// Loads the deployments associated with this file
-	LoadDeployments() ([]types.Deployment, error)
-}
-
+// SimpleResource is a [types.Resource] implementation for resources that
+// contain no images, no additional CRDs and
+// expand only to themselves.
 type SimpleResource struct {
 	Node *yaml.Node
 }
@@ -140,6 +145,7 @@ func LockFileName(name string) Option {
 // digests. This is useful when only populating a lock file.
 func NoWrite(o *Options) { o.noWrite = true }
 
+// Digester consumes YAML resources and updates any image names with their pinned equivalents.
 type Digester struct {
 	Filename      string
 	options       Options
@@ -228,20 +234,34 @@ func (ky *Digester) configureLockfile() error {
 	return nil
 }
 
+// Loads the [Digester] from a YAML document file
 func (ky *Digester) LoadFile(filename string) (err error) {
 	defer Catch(&err)
 	ky.Filename = filename
 	Check(ky.configureLockfile())
 	if filename == "-" {
-		Check(ky.Read(os.Stdin))
+		Check(ky.read(os.Stdin))
 	} else {
 		input := Try(os.Open(filename))
 		defer input.Close()
-		Check(ky.Read(input))
+		Check(ky.read(input))
 	}
 	return
 }
 
+// Loads the [Digester] from a YAML document provided by an [io.Reader] stream.
+func (ky *Digester) LoadStream(input io.Reader) (err error) {
+	defer Catch(&err)
+	ky.Filename = "(stream)"
+	if ky.options.lockFileName != "" {
+		Check(ky.configureLockfile())
+	}
+	Check(ky.read(input))
+	return
+}
+
+// Writes the contents of the associated lock file, if any, updating
+// it with the most recent lock values.
 func (ky *Digester) WriteAnyLocks() error {
 	if ky.lockfile != nil && ky.options.generateLocks {
 		return ky.lockfile.Save()
@@ -249,16 +269,21 @@ func (ky *Digester) WriteAnyLocks() error {
 	return nil
 }
 
-func (ky *Digester) Read(input io.Reader) (err error) {
+// read reads YAML documents from the supplied input stream, populating the
+// instance's [Digester.Docs] field, before processing them into a list of
+// [types.Resource] via the [Digester.readDocs] method.
+func (ky *Digester) read(input io.Reader) (err error) {
 	if ky.Docs, err = yu.StreamDocsIn(input); err != nil {
 		return
 	}
 	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
 	log.Debug("found {{.ndocs}} document(s) in {{.file}}")
-	return ky.ReadDocs()
+	return ky.readDocs()
 }
 
-func (ky *Digester) ReadDocs() (err error) {
+// readDocs ingests the [Digester.Docs] list of raw YAML documents defined in this instance,
+// identifying and processing them into a list of [types.Resource] items in [Digester.Resources].
+func (ky *Digester) readDocs() (err error) {
 	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
 	ky.Resources = make([]types.Resource, len(ky.Docs))
 nextDoc:
@@ -290,6 +315,8 @@ nextDoc:
 	return
 }
 
+// ExpandResources takes the current set of [Digester.Resources] and expands each, via
+// [types.Resource.Expand]
 func (ky *Digester) ExpandResources() (err error) {
 	newDocs := make([]*yaml.Node, 0, len(ky.Docs))
 	for _, resource := range ky.Resources {
@@ -302,9 +329,14 @@ func (ky *Digester) ExpandResources() (err error) {
 	ky.Docs = newDocs
 	ky.Cleanup()
 
-	return ky.ReadDocs()
+	return ky.readDocs()
 }
 
+// CreateDigests will iterate over previously identified resources performing the [types.Digest]
+// action on all those resources that support it. For well defined workloads, such as Kubernetes
+// deployments, the image name is replaced by its digest. For resources that process Helm charts
+// (like k3s' HelmChart) an attempt is made to update its image values to produce the required
+// pining image names.
 func (ky *Digester) CreateDigests() (err error) {
 	log := slog.With("file", ky.Filename)
 	for n, r := range ky.Resources {
@@ -322,6 +354,11 @@ func (ky *Digester) CreateDigests() (err error) {
 	return
 }
 
+// VerifyDigests will iterate over previously identified resources performing the [types.Verify]
+// action on all those resources that support it. Typically this means checking that the image
+// follows policy and if a tag and digest are both present, check the digest is correct. When using
+// a lock file, verify will check that a lookup on the lock file returns an item with a matching
+// name, digest and tag.
 func (ky *Digester) VerifyDigests() (err error) {
 	log := slog.With("file", ky.Filename)
 	for n, r := range ky.Resources {
@@ -335,6 +372,8 @@ func (ky *Digester) VerifyDigests() (err error) {
 	return
 }
 
+// CRDs compiles a list of custom resource definitions provided by each resource. Typically
+// only Helm chart resources will return a CRD.
 func (ky *Digester) CRDs() (crds []*yaml.Node, err error) {
 	for _, resource := range ky.Resources {
 		var docs []*yaml.Node
@@ -346,6 +385,11 @@ func (ky *Digester) CRDs() (crds []*yaml.Node, err error) {
 	return
 }
 
+// WriteFile will write out the set of processed resources, as YAML text, back
+// to the original file. This call only makes sense for operations that mutate
+// resources, e.g. pinning images in Helm chart values. If there is no file name
+// defined in the [Digester], an [ErrNoFileWrite] error is returned. If the file
+// name is "-", the output is written to stdout.
 func (ky *Digester) WriteFile() (err error) {
 	defer Catch(&err)
 	if ky.Filename == "" {
@@ -365,6 +409,8 @@ func (ky *Digester) WriteFile() (err error) {
 	return nil
 }
 
+// Write write the text of the digested YAML documents to the supplied
+// output [io.Writer].
 func (ky *Digester) Write(output io.Writer) (err error) {
 	defer Catch(&err)
 	docs := slices.Map(ky.Resources, func(r types.Resource) *yaml.Node { return Try(r.Save()) })
@@ -372,6 +418,10 @@ func (ky *Digester) Write(output io.Writer) (err error) {
 	return
 }
 
+// WriteUsingMethod write the text of the digested YAML documents to the
+// supplied output [io.Writer], using a write method that is designed to
+// preserve as much of the original formatting, whitespace and comments as
+// possible.
 func (ky *Digester) WriteUsingMethod(original io.Reader, output io.Writer) (err error) {
 	defer Catch(&err)
 	method := ky.options.updateMethod
@@ -389,6 +439,16 @@ func (ky *Digester) WriteUsingMethod(original io.Reader, output io.Writer) (err 
 	return nil
 }
 
+// Cleanup performs cleanup actions. This should be called after all processing
+// is completed. It is recommended that all processing be performed in a
+// function that defers a call to Cleanup.
+//
+//	func processData() {
+//	  dig := NewDigester()
+//	  defer dig.Cleanup()
+//	  // Continue with processing
+//	  // ...
+//	}
 func (ky *Digester) Cleanup() (err error) {
 	for _, doc := range ky.Resources {
 		if doc != nil {
@@ -440,6 +500,10 @@ func compareDocs(ds1 []*yaml.Node, ds2 []*yaml.Node) error {
 	return nil
 }
 
+// CreateDigests is used to patch resources in place, replacing tagged
+// images with digests. If the resources include Helm chart deployments,
+// such as helm.cattle.io HelmChart, and best effort attempt is made to
+// patch chart values that determine image names.
 func CreateDigests(filename string, options ...Option) (err error) {
 	defer Handle(func(e error) {
 		err = fmt.Errorf("%s: %w", filename, e)
@@ -460,7 +524,7 @@ func CreateDigests(filename string, options ...Option) (err error) {
 		verifier := NewVerificationDigester(digester)
 		defer verifier.Cleanup()
 		slog.Debug("{{.file}}: performing verification pass")
-		Check(verifier.Read(&buffer))
+		Check(verifier.read(&buffer))
 		Check(compareDocs(digester.DigestedDocs, verifier.Docs))
 		Check(verifier.VerifyDigests())
 		slog.Info("{{.file}}: round-trip verified {{.ndocs}} docs", "ndocs", len(verifier.Docs))
@@ -484,6 +548,12 @@ func VerifyDigests(filename string, options ...Option) (err error) {
 	return
 }
 
+// DigestKube is used to expand all resources in the file with the supplied
+// filename, replacing any Helm resources, such as helm.cattle.io HelmChart resources,
+// by the resources the templates resolve into. Any resulting workload resource that
+// contain image names are pinned. The resulting [Digester] containing the pinned
+// [Digester.Resources] is returned. These may be written to an output destination
+// by one of the [Digester] write methods.
 func DigestKube(filename string, options ...Option) (digester *Digester, err error) {
 	defer Handle(func(e error) {
 		err = fmt.Errorf("%s: %w", filename, e)
@@ -500,6 +570,9 @@ func DigestKube(filename string, options ...Option) (digester *Digester, err err
 	return
 }
 
+// FetchCrds will return the raw YAML nodes of any custom resource definitions
+// defined by any of the resources contained in the input file with the supplied
+// filename.
 func FetchCrds(filename string, options ...Option) (crds []*yaml.Node, err error) {
 	defer Handle(func(e error) {
 		err = fmt.Errorf("%s: %w", filename, e)
@@ -513,6 +586,9 @@ func FetchCrds(filename string, options ...Option) (crds []*yaml.Node, err error
 	return
 }
 
+// WriteCombinedDigests takes a list of *[Digester] objects and writes the YAML
+// text of their [Digester.Resources] as a single combined multi-document text
+// to an output stream.
 func WriteCombinedDigests(digests []*Digester, output io.Writer) (err error) {
 	defer Catch(&err)
 	totalLen := slices.Fold(digests, 0, func(total int, digest *Digester) int { return total + len(digest.Resources) })

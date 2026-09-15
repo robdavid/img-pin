@@ -8,6 +8,8 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+// K8SResource is an implementation of [digester.Resource] which handles image pinning in well known
+// workload resource types, such as StatefulSet, Deployment, Job etc.
 type K8SResource struct {
 	resource *yaml.Node
 	targets  []yu.PathAndNode
@@ -39,11 +41,14 @@ func (k8s *K8SResource) CRDs() ([]*yaml.Node, error)   { return nil, nil }
 
 type K8SWorkloadHandler struct{}
 
+// Match matches the given resource YAML document with a well known workload
+// resource type, and determines path location of image names that require
+// patching when pinning. If there is a match, a *[K8SResource] implementation
+// of [types.Resource] is returned. Otherwise nil is returned.
 func (K8SWorkloadHandler) Match(doc *yaml.Node, imageDigester digester.ImageDigester, options skipping.ImageOptions) types.Resource {
 	if targets := yu.K8S_WORKLOAD_SIGNATURE.Matches(doc); targets != nil {
 		yamlDigester := digester.MakeYamlDigester(imageDigester)
-		k8s := K8SResource{targets: targets, options: options, digester: yamlDigester, resource: doc}
-		return &k8s
+		return &K8SResource{targets: targets, options: options, digester: yamlDigester, resource: doc}
 	}
 	return nil
 }

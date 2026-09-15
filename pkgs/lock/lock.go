@@ -15,7 +15,10 @@ import (
 	"github.com/robdavid/img-pin/pkgs/images"
 )
 
-var ErrImageNoLock = errors.New("no lock info found for image")
+var (
+	ErrImageNoLock = errors.New("no lock info found for image")
+	ErrNoFileName  = errors.New("lock file has no file name")
+)
 
 type Time struct {
 	time.Time
@@ -60,6 +63,8 @@ type LockData struct {
 
 type LockIndex map[string]*ImageData
 
+// Lockfile represents an image lock file containing mappings from
+// original provided image names to their pinned equivalents.
 type Lockfile struct {
 	Filename        string
 	Locks           LockData
@@ -68,6 +73,11 @@ type Lockfile struct {
 	Index           LockIndex
 }
 
+// NewLockFile creates a new empty [Lockfile] to be stored at the
+// provided file name, which may or may not exist. No attempt is
+// made to load the file. This can be done with the [Lockfile.Load]
+// method, or the lockfile can be populated with data and the
+// file created/overwritten with [Lockfile.Save].
 func NewLockfile(filename string) *Lockfile {
 	return &Lockfile{Filename: filename}
 }
@@ -96,11 +106,21 @@ func (lf *Lockfile) index() {
 	}
 }
 
+// Load loads lock file data from its file name. If the file name
+// is empty, an [ErrNoFileName] error is returned. If the file
+// does not exist and [Lockfile.CreateIfMissing] is set, a new
+// empty file is created, and the lock data is zeroised. Otherwise,
+// a missing file returns an error.
 func (lf *Lockfile) Load() error {
+	if lf.Filename == "" {
+		return fmt.Errorf("%w, cannot load", ErrNoFileName)
+	}
+	defer lf.index()
 	bytes, err := os.ReadFile(lf.Filename)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) && lf.CreateIfMissing {
 			emptyData := LockData{}
+			lf.Locks = emptyData
 			var out []byte
 			var err error
 			if out, err = yaml.Marshal(&emptyData); err != nil {
@@ -113,13 +133,16 @@ func (lf *Lockfile) Load() error {
 	if err := yaml.Unmarshal(bytes, &lf.Locks); err != nil {
 		return err
 	}
-	lf.index()
 	return nil
 }
 
+// Saves the [Lockfile] data to its filename. If the file name
+// is empty, an error is returned.
 func (lf *Lockfile) Save() error {
 	if out, err := yaml.Marshal(&lf.Locks); err != nil {
 		return err
+	} else if lf.Filename == "" {
+		return fmt.Errorf("%w, cannot save", ErrNoFileName)
 	} else {
 		return os.WriteFile(lf.Filename, out, 0644)
 	}
