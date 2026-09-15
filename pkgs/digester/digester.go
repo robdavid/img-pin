@@ -22,21 +22,26 @@ import (
 )
 
 var (
+	// ErrUnexpectedResourceType indicates that an unexpected resource type was
+	// encountered.
 	ErrUnexpectedResourceType = errors.New("unexpected resource type encountered")
-	ErrNoFileWrite            = errors.New("cannot write, input is a stream")
-	ErrRoundTrip              = errors.New("output file has not preserved all the data from the input file")
-	ErrLockFileName           = errors.New("no lock file name was provided or could be inferred")
+
+	// ErrNoFileWrite indicates that a file cannot be written because the input
+	// was a stream and not a file.
+	ErrNoFileWrite = errors.New("cannot write, input is a stream")
+
+	// ErrRoundTrip indicates that on verification of output via round tripping,
+	// discrepancies were found.
+	ErrRoundTrip = errors.New("output file has not preserved all the data from the input file")
+
+	// ErrLockFileName indicates that no lock file name was provided, and no
+	// default was available, when writing a lock file.
+	ErrLockFileName = errors.New("no lock file name was provided or could be inferred")
 )
 
-type DeploymentLoader interface {
-	// Filename returns the file path of the file that describes one or
-	// more deployments
-	Filename() string
-
-	// Loads the deployments associated with this file
-	LoadDeployments() ([]types.Deployment, error)
-}
-
+// SimpleResource is a [types.Resource] implementation for resources that
+// contain no images, no additional CRDs and
+// expand only to themselves.
 type SimpleResource struct {
 	Node *yaml.Node
 }
