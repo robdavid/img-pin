@@ -120,13 +120,16 @@ func (lf *Lockfile) Load() error {
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) && lf.CreateIfMissing {
 			emptyData := LockData{}
-			lf.Locks = emptyData
 			var out []byte
 			var err error
 			if out, err = yaml.Marshal(&emptyData); err != nil {
 				return err
 			}
-			return os.WriteFile(lf.Filename, out, 0644)
+			if err := os.WriteFile(lf.Filename, out, 0644); err != nil {
+				return nil
+			}
+			lf.Locks = emptyData
+			return nil
 		}
 		return err
 	}
