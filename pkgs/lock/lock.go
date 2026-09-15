@@ -73,7 +73,8 @@ type Lockfile struct {
 	Locks LockData
 	// Locking is true when digests are being computed from registries
 	Locking bool
-	// CreateIfMissing indicates whether a new lock file is to be created by [LockFile.Save] if it does not already exist,
+	// CreateIfMissing indicates whether a new lock file is to be created by
+	// [Lockfile.Save] if it does not already exist,
 	CreateIfMissing bool
 	// Index contains a map of image names to their associated lock data.
 	Index LockIndex
