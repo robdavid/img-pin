@@ -126,7 +126,7 @@ func (lf *Lockfile) Load() error {
 				return err
 			}
 			if err := os.WriteFile(lf.Filename, out, 0644); err != nil {
-				return nil
+				return err
 			}
 			lf.Locks = emptyData
 			return nil
