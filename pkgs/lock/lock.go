@@ -66,11 +66,18 @@ type LockIndex map[string]*ImageData
 // Lockfile represents an image lock file containing mappings from
 // original provided image names to their pinned equivalents.
 type Lockfile struct {
-	Filename        string
-	Locks           LockData
-	Locking         bool
+	// Filename is the name of the underlying lock file (may be empty)
+	Filename string
+	// Locks contains the main locking data; this object is marshalled as YAML
+	// when writing the lock file.
+	Locks LockData
+	// Locking is true when digests are being computed from registries
+	Locking bool
+	// CreateIfMissing indicates whether a new lock file is to be created by
+	// [Lockfile.Save] if it does not already exist,
 	CreateIfMissing bool
-	Index           LockIndex
+	// Index contains a map of image names to their associated lock data.
+	Index LockIndex
 }
 
 // NewLockFile creates a new empty [Lockfile] to be stored at the
