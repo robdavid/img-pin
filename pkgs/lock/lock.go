@@ -78,6 +78,12 @@ type Lockfile struct {
 	CreateIfMissing bool
 	// Index contains a map of image names to their associated lock data.
 	Index LockIndex
+	// Updating indicates that existing digests can be updated from an existing
+	// tagged image.
+	Updating bool
+	// UpdateOnly, when non-nil, defines a set of tagged images that are allowed
+	// to be updated when [Lockfile.Update] is true.
+	UpdateOnly map[string]bool
 }
 
 // NewLockFile creates a new empty [Lockfile] to be stored at the
@@ -159,9 +165,43 @@ func (lf *Lockfile) Save() error {
 }
 
 func imageKey(image *images.Image) string {
-	keyImage := *image
-	// keyImage.Digest = "" // Also create locks for pre-digested images
-	return keyImage.String()
+	return image.String()
+}
+
+func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey string, options ...images.ImageOption) (created time.Time, err error) {
+	var imageData ImageData
+	imageData.Source = *image
+	if created, err = image.GetDigest(slices.Affix(options, images.FetchTime)...); err != nil {
+		if errors.Is(err, images.ErrSchemaV1) {
+			imageData.UnsupportedSchema = 1
+			_, err = image.GetDigest(options...)
+		}
+	}
+	if err != nil {
+		// This image digest has failed. This may have failed for a reason
+		// the caller will consider to be non-fatal, so the logic here is to
+		// simply create a lock entry with no digest. If the lock file is
+		// eventually written, it will have captured this information. If
+		// the error was fatal, the lock data is ultimately discarded and
+		// this bad digest will non persist.
+		slog.Debug("locking image digest: {{.key}}: no digest")
+	} else {
+		slog = slog.With("digest", &imageData.Digest)
+		imageData.Digest = opt.Reference(image.Clone())
+		imageData.Created = Time{created}
+		slog.Debug("locking image digest: {{.key}}: {{.digest}}")
+	}
+	if lf.Index == nil {
+		lf.Index = make(LockIndex)
+	}
+	if lockImage := lf.Index[imageKey]; lockImage != nil {
+		*lockImage = imageData
+	} else {
+		lf.Locks.Images = append(lf.Locks.Images, imageData)
+		lf.Index[imageKey] = &lf.Locks.Images[len(lf.Locks.Images)-1]
+		lf.Index[imageData.Digest.String()] = &lf.Locks.Images[len(lf.Locks.Images)-1]
+	}
+	return
 }
 
 // GetDigest obtains a digest for an image, either from the lock file data or
@@ -175,65 +215,46 @@ func imageKey(image *images.Image) string {
 // result of subsequent calls to this method regardless of the tag options used
 // in that subsequent call.
 func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption) (created time.Time, err error) {
-	if lf.Locking {
-		imageKey := imageKey(image)
-		slog := slog.With("key", imageKey)
-		var imageData ImageData
-		if locked := lf.Index[imageKey]; locked != nil {
-			slog.Debug("not changing {{.key}} which already has a digest")
-			if locked.Digest.HasValue() {
-				*image = locked.Digest.Get()
-			}
-			return
-		}
-		if lf.Index == nil {
-			lf.Index = make(LockIndex)
-		}
-		imageData.Source = *image
-		if created, err = image.GetDigest(slices.Affix(options, images.FetchTime)...); err != nil {
-			if errors.Is(err, images.ErrSchemaV1) {
-				imageData.UnsupportedSchema = 1
-				_, err = image.GetDigest(options...)
-			}
-		}
-		if err != nil {
-			// This image digest has failed. This may have failed for a reason the caller
-			// considers to be non-fatal, so the logic here is to simply create a lock entry
-			// with no digest. If the lock file is eventually written, it will have captured
-			// this information. If the error was fatal, the lock data is ultimately discarded
-			// and this bad digest will non persist.
-			slog.Debug("locking image digest: {{.key}}: no digest")
-		} else {
-			slog = slog.With("digest", &imageData.Digest)
-			imageData.Digest = opt.Reference(image.Clone())
-			imageData.Created = Time{created}
-			slog.Debug("locking image digest: {{.key}}: {{.digest}}")
-		}
-		if lf.Index == nil {
-			lf.Index = make(LockIndex)
-		}
-		lf.Locks.Images = append(lf.Locks.Images, imageData)
-		lf.Index[imageKey] = &lf.Locks.Images[len(lf.Locks.Images)-1]
-		lf.Index[imageData.Digest.String()] = &lf.Locks.Images[len(lf.Locks.Images)-1]
+
+	imageKey := imageKey(image)
+	slog := slog.With("key", imageKey)
+	var locked *ImageData
+	if lf.Index == nil {
+		lf.Index = make(LockIndex)
+		locked = nil
 	} else {
-		imageKey := imageKey(image)
-		imageData := lf.Index[imageKey]
-		slog.Debug("lockfile lookup of {{.key}} gives {{.digest}}", "key", imageKey, "digest", imageData)
-		if imageData == nil {
-			err = fmt.Errorf("%q: %w", image, ErrImageNoLock)
-			return
-		}
-		if imageData.Digest.HasValue() {
-			*image = imageData.Digest.Get()
-			slog.Debug("retreived digest from lock file: {{.digest}}", "digest", image)
+		locked = lf.Index[imageKey]
+	}
+
+	if lf.Updating && locked != nil {
+		if lf.UpdateOnly == nil || lf.UpdateOnly[imageKey] {
+			return lf.upsert(slog, image, imageKey, options...)
 		} else {
-			err = images.ErrSkipImage
-			slog.Debug("retreived digest from lock file: {{.digest}}", "digest", image)
+			slog.Debug("not updating {{.key}} which is not to be updated")
 		}
-		created = imageData.Created.Time
-		if imageData.UnsupportedSchema == 1 {
-			err = images.ErrSchemaV1
+	} else if lf.Locking {
+		if locked == nil {
+			return lf.upsert(slog, image, imageKey, options...)
+		} else {
+			slog.Debug("not changing {{.key}} which already has a digest")
 		}
+	}
+
+	slog.Debug("lockfile lookup of {{.key}} gives {{.digest}}", "key", imageKey, "digest", locked)
+	if locked == nil {
+		err = fmt.Errorf("%q: %w", image, ErrImageNoLock)
+		return
+	}
+	if locked.Digest.HasValue() {
+		*image = locked.Digest.Get()
+		slog.Debug("retrieved digest from lock file: {{.digest}}", "digest", image)
+	} else {
+		err = images.ErrSkipImage
+		slog.Debug("retrieved digest from lock file: {{.digest}}", "digest", image)
+	}
+	created = locked.Created.Time
+	if locked.UnsupportedSchema == 1 {
+		err = images.ErrSchemaV1
 	}
 	return
 }
