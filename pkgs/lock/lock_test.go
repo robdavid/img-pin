@@ -333,3 +333,42 @@ func TestGetDigest_SkippedByPolicy(t *testing.T) {
 	buf := bytes.NewBuffer(out)
 	io.Copy(os.Stdout, buf)
 }
+
+// TestAttemptUpgradeWhenDisabled attempts to updated a lock when lock updates
+// are not enabled, and asserts it does not occur.
+func TestAttemptUpgradeWhenDisabled(t *testing.T) {
+	test.ReportErr(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
+	lf := lock.Make()
+	lf.Locking = true
+	lf.GetDigest(Try(images.Parse("ubuntu:24.04")))
+	require.Equal(1, len(lf.Locks.Images))
+	digest1 := lf.Locks.Images[0].Digest.Get().Digest
+	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
+	lf.GetDigest(Try(images.Parse("ubuntu:24.04")))
+	require.Equal(1, len(lf.Locks.Images))
+	digest2 := lf.Locks.Images[0].Digest.Get().Digest
+	assert.Equal(digest1, digest2)
+}
+
+func TestAttemptUpgradeWhenEnabled(t *testing.T) {
+	test.ReportErr(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
+	lf := lock.Make()
+	lf.Locking = true
+	lf.GetDigest(Try(images.Parse("ubuntu:24.04")))
+	require.Equal(1, len(lf.Locks.Images))
+	digest1 := lf.Locks.Images[0].Digest.Get().Digest
+	lf.Updating = true
+	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
+	lf.GetDigest(Try(images.Parse("ubuntu:24.04")))
+	require.Equal(1, len(lf.Locks.Images))
+	digest2 := lf.Locks.Images[0].Digest.Get().Digest
+	assert.NotEqual(digest1, digest2)
+}

@@ -152,6 +152,12 @@ func (lf *Lockfile) Load() error {
 	return nil
 }
 
+// AsYAML returns the lockfile YAML text as a byte array
+func (lf *Lockfile) AsYAML() (yml []byte, err error) {
+	yml, err = yaml.Marshal(&lf.Locks)
+	return
+}
+
 // Saves the [Lockfile] data to its filename. If the file name
 // is empty, an error is returned.
 func (lf *Lockfile) Save() error {
@@ -162,6 +168,11 @@ func (lf *Lockfile) Save() error {
 	} else {
 		return os.WriteFile(lf.Filename, out, 0644)
 	}
+}
+
+// Saves the [Lockfile] data to the provided yaml Encoder
+func (lf *Lockfile) SaveTo(encoder yaml.Encoder) error {
+	return encoder.Encode(&lf.Locks)
 }
 
 func imageKey(image *images.Image) string {

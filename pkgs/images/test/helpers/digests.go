@@ -12,6 +12,15 @@ var past = time.Now().Add(-time.Hour * 20000)
 var crusty = time.Now().Add(-time.Hour * 40000)
 var mkMock = MakeMockDigest
 var errMock = MakeMockDigestErr
+
+var MutableMockDigests = []MockDigest{
+	mkMock("4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90", past, "docker.io/library/ubuntu:24.04"),
+}
+
+var MutableMockDigests2 = []MockDigest{
+	mkMock("69cecf4bbf72d2d44a9eef1b71fb98c7fb973d78af11399deccef19beb008ad9", yesterday, "docker.io/library/ubuntu:24.04"),
+}
+
 var CommonMockDigests = []MockDigest{
 	mkMock("4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90", yesterday, "docker.io/library/ubuntu:24.04"),
 	mkMock("de0eb0b3f2a47ba1eb89389859a9bd88b28e82f5826b6969ad604979713c2d4f", past, "docker.io/library/alpine:3.18"),
@@ -39,3 +48,5 @@ var CommonMockDigests = []MockDigest{
 }
 
 var CommonMockDigestFunc = MockDigestImage(CommonMockDigests)
+var MutableMockDigestsFunc = MockDigestImage(MutableMockDigests)
+var MutableMockDigests2Func = MockDigestImage(MutableMockDigests2)
