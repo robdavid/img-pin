@@ -14,6 +14,7 @@ import (
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/images"
 	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
+	"github.com/robdavid/img-pin/pkgs/internal/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -388,7 +389,6 @@ func TestAttemptUpgradeWhenEnabled(t *testing.T) {
 
 func TestAttemptUpgradeWhenSelectivelyEnabled(t *testing.T) {
 	defer test.ReportErr(t)
-	//require := require.New(t)
 	assert := assert.New(t)
 
 	const imageName = "ubuntu:24.04"
@@ -418,4 +418,34 @@ func TestAttemptUpgradeWhenSelectivelyEnabled(t *testing.T) {
 	Check(lf.Verify())
 	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, imageName)), digests[0])
 	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests2, upgradeImageName)), digests[1])
+}
+
+func TestPrune(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	imageNames := []string{"ubuntu:24.04", "alpine:3.18", "hashicorp/vault:1.13.3"}
+	lockfile := helpers.CreateTemp(t, ".lock.yaml")
+
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	lf := lock.NewLockfile(lockfile)
+
+	lf.Locking = true
+	for _, imageName := range imageNames {
+		Try(lf.GetDigest(Try(images.Parse(imageName))))
+	}
+
+	Check(lf.Save())
+
+	lf2 := lock.NewLockfile(lockfile)
+	Check(lf2.Load())
+
+	assert.Equal(len(imageNames), len(lf2.Locks.Images))
+	Check(lf2.Verify())
+
+	Try(lf2.GetDigest(Try(images.Parse(imageNames[0]))))
+	lf2.Prune()
+
+	assert.Equal(1, len(lf2.Locks.Images))
+	Check(lf2.Verify())
+
 }

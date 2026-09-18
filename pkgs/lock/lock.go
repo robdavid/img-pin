@@ -47,6 +47,7 @@ type ImageData struct {
 	Digest            opt.Ref[images.Image] `yaml:"digest,omitempty"`
 	Created           Time                  `yaml:"created,omitempty"`
 	UnsupportedSchema int                   `yaml:"schemaVersion,omitempty"`
+	accessed          bool
 }
 
 func img2StringPtr(i *images.Image) *string { return new(i.String()) }
@@ -195,6 +196,7 @@ func imageKey(image *images.Image) string {
 func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey string, options ...images.ImageOption) (created time.Time, err error) {
 	var imageData ImageData
 	imageData.Source = *image
+	imageData.accessed = true
 	if created, err = image.GetDigest(slices.Affix(options, images.FetchTime)...); err != nil {
 		if errors.Is(err, images.ErrSchemaV1) {
 			imageData.UnsupportedSchema = 1
@@ -207,7 +209,7 @@ func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey stri
 		// simply create a lock entry with no digest. If the lock file is
 		// eventually written, it will have captured this information. If
 		// the error was fatal, the lock data is ultimately discarded and
-		// this bad digest will non persist.
+		// this bad digest will not persist.
 		slog.Debug("locking image digest: {{.key}}: no digest")
 	} else {
 		slog = slog.With("digest", &imageData.Digest)
@@ -276,6 +278,7 @@ func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption
 		err = fmt.Errorf("%q: %w", image, ErrImageNoLock)
 		return
 	}
+	locked.accessed = true
 	if locked.Digest.HasValue() {
 		*image = locked.Digest.Get()
 		slog.Debug("retrieved digest from lock file: {{.digest}}", "digest", image)
@@ -290,6 +293,8 @@ func (lf *Lockfile) GetDigest(image *images.Image, options ...images.ImageOption
 	return
 }
 
+// VerifyDigest checks that image provided has an entry in the lock file and the entry
+// matches the image provided. The provided image must have a digest.
 func (lf *Lockfile) VerifyDigest(image *images.Image, options ...images.ImageOption) (err error) {
 	imageKey := imageKey(image)
 	imageData := lf.Index[imageKey]
@@ -302,6 +307,7 @@ func (lf *Lockfile) VerifyDigest(image *images.Image, options ...images.ImageOpt
 	return
 }
 
+// Verify checks the integrity of the data structures.
 func (lf *Lockfile) Verify() error {
 	for i := range lf.Locks.Images {
 		entry := &lf.Locks.Images[i]
@@ -321,4 +327,10 @@ func (lf *Lockfile) Verify() error {
 // one could not be found.
 func (lf *Lockfile) Lookup(image *images.Image) opt.Ref[ImageData] {
 	return opt.Reference(lf.Index[imageKey(image)])
+}
+
+// Prune removes all entries from the lockfile that have not been accessed.
+func (lf *Lockfile) Prune() {
+	lf.Locks.Images = slices.FilterRef(lf.Locks.Images, func(data *ImageData) bool { return data.accessed })
+	lf.index()
 }
