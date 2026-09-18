@@ -15,10 +15,13 @@ var errMock = MakeMockDigestErr
 
 var MutableMockDigests = []MockDigest{
 	mkMock("4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90", past, "docker.io/library/ubuntu:24.04"),
+	mkMock("7fa362f5e7c036d7f45621a6c721c03493cdcb5889adfcd65587759e34fe4c6f", past, "docker.io/library/debian:stable"),
 }
 
 var MutableMockDigests2 = []MockDigest{
 	mkMock("69cecf4bbf72d2d44a9eef1b71fb98c7fb973d78af11399deccef19beb008ad9", yesterday, "docker.io/library/ubuntu:24.04"),
+	// Actually stable-backports hash on 18/09/2026
+	mkMock("03723759e77a42a22bd023dcceefdc1f5baa71c975635cfaba7a015047877060", yesterday, "docker.io/library/debian:stable"),
 }
 
 var CommonMockDigests = []MockDigest{

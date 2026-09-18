@@ -18,6 +18,7 @@ import (
 var (
 	ErrImageNoLock = errors.New("no lock info found for image")
 	ErrNoFileName  = errors.New("lock file has no file name")
+	ErrVerify      = errors.New("internal verification error")
 )
 
 type Time struct {
@@ -111,10 +112,11 @@ func (lf *Lockfile) index() {
 	lf.Index = make(LockIndex)
 	for i := range lf.Locks.Images {
 		key := lf.Locks.Images[i].Source.String()
-		lf.Index[key] = &lf.Locks.Images[i]
+		entry := &lf.Locks.Images[i]
+		lf.Index[key] = entry
 		if dig, ok := lf.Locks.Images[i].Digest.RefOK(); ok {
 			key2 := dig.String()
-			lf.Index[key2] = &lf.Locks.Images[i]
+			lf.Index[key2] = entry
 		}
 	}
 }
@@ -175,6 +177,17 @@ func (lf *Lockfile) SaveTo(encoder yaml.Encoder) error {
 	return encoder.Encode(&lf.Locks)
 }
 
+func (lf *Lockfile) SelectForUpgrade(images ...*images.Image) {
+	lf.UpdateOnly = make(map[string]bool)
+	for _, image := range images {
+		lf.UpdateOnly[image.String()] = true
+	}
+}
+
+func (lf *Lockfile) SelectAllForUpgrade() {
+	lf.UpdateOnly = nil
+}
+
 func imageKey(image *images.Image) string {
 	return image.String()
 }
@@ -208,9 +221,16 @@ func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey stri
 	if lockImage := lf.Index[imageKey]; lockImage != nil {
 		*lockImage = imageData
 	} else {
+		old := lf.Locks.Images
 		lf.Locks.Images = append(lf.Locks.Images, imageData)
-		lf.Index[imageKey] = &lf.Locks.Images[len(lf.Locks.Images)-1]
-		lf.Index[imageData.Digest.String()] = &lf.Locks.Images[len(lf.Locks.Images)-1]
+		if len(old) > 0 && &old[0] != &lf.Locks.Images[0] {
+			// Slice was reallocated
+			lf.index()
+		} else {
+			entry := &lf.Locks.Images[len(lf.Locks.Images)-1]
+			lf.Index[imageKey] = entry
+			lf.Index[imageData.Digest.String()] = entry
+		}
 	}
 	return
 }
@@ -280,4 +300,25 @@ func (lf *Lockfile) VerifyDigest(image *images.Image, options ...images.ImageOpt
 		err = fmt.Errorf("%q: %w", image, images.ErrNoDigest)
 	}
 	return
+}
+
+func (lf *Lockfile) Verify() error {
+	for i := range lf.Locks.Images {
+		entry := &lf.Locks.Images[i]
+		indexedEntry := lf.Index[imageKey(&entry.Source)]
+		if entry != indexedEntry {
+			if indexedEntry == nil {
+				return fmt.Errorf("%w: no index entry found for %q", ErrVerify, &entry.Source)
+			} else {
+				return fmt.Errorf("%w: index entry for %q points at other entry %q", ErrVerify, &entry.Source, &indexedEntry.Source)
+			}
+		}
+	}
+	return nil
+}
+
+// Lookup finds the lock entry for the given image, or an empty reference if
+// one could not be found.
+func (lf *Lockfile) Lookup(image *images.Image) opt.Ref[ImageData] {
+	return opt.Reference(lf.Index[imageKey(image)])
 }
