@@ -230,7 +230,10 @@ func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey stri
 		lf.Index = make(LockIndex)
 	}
 	if lockImage := lf.Index[imageKey]; lockImage != nil {
+		delete(lf.Index, lockImage.Digest.String())
 		*lockImage = imageData
+		lf.Index[imageData.Digest.String()] = lockImage
+
 	} else {
 		old := lf.Locks.Images
 		lf.Locks.Images = append(lf.Locks.Images, imageData)
@@ -318,16 +321,28 @@ func (lf *Lockfile) VerifyDigest(image *images.Image, options ...images.ImageOpt
 
 // Verify checks the integrity of the data structures.
 func (lf *Lockfile) Verify() error {
+	indexCount := 0
 	for i := range lf.Locks.Images {
 		entry := &lf.Locks.Images[i]
-		indexedEntry := lf.Index[imageKey(&entry.Source)]
-		if entry != indexedEntry {
-			if indexedEntry == nil {
-				return fmt.Errorf("%w: no index entry found for %q", ErrVerify, &entry.Source)
-			} else {
-				return fmt.Errorf("%w: index entry for %q points at other entry %q", ErrVerify, &entry.Source, &indexedEntry.Source)
+		indexedImages := make([]*images.Image, 1, 2)
+		indexedImages[0] = &entry.Source
+		if digest, ok := entry.Digest.RefOK(); ok {
+			indexedImages = append(indexedImages, digest)
+		}
+		indexCount += len(indexedImages)
+		for _, indexedImage := range indexedImages {
+			indexedEntry := lf.Index[imageKey(indexedImage)]
+			if entry != indexedEntry {
+				if indexedEntry == nil {
+					return fmt.Errorf("%w: no index entry found for %q", ErrVerify, indexedImage)
+				} else {
+					return fmt.Errorf("%w: index entry for %q points at other entry %q", ErrVerify, indexedImage, &indexedEntry.Source)
+				}
 			}
 		}
+	}
+	if indexCount != len(lf.Index) {
+		return fmt.Errorf("%w: expected %d index entries, but got %d", ErrVerify, indexCount, len(lf.Index))
 	}
 	return nil
 }

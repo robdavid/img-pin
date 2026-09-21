@@ -371,19 +371,23 @@ func TestAttemptUpgradeWhenEnabled(t *testing.T) {
 	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
 	lf := lock.Make()
 	lf.Locking = true
-	lf.GetDigest(Try(images.Parse(imageName)))
+	image := Try(images.Parse(imageName))
+	Try(lf.GetDigest(image))
 	require.Equal(1, len(lf.Locks.Images))
 	digest1 := lf.Locks.Images[0].Digest.Get().Digest
 	expectedDigest1 := "sha256:" + Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, imageName))
 	assert.Equal(expectedDigest1, digest1)
+	Try(lf.GetDigest(image)) // Check lookup with digested image
 	lf.Updating = true
 	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
-	lf.GetDigest(Try(images.Parse(imageName)))
+	image = Try(images.Parse(imageName))
+	Try(lf.GetDigest(image))
 	require.Equal(1, len(lf.Locks.Images))
 	digest2 := lf.Locks.Images[0].Digest.Get().Digest
 	assert.NotEqual(digest1, digest2)
 	expectedDigest2 := "sha256:" + Try(imghelpers.FindDigest(imghelpers.MutableMockDigests2, imageName))
 	assert.Equal(expectedDigest2, digest2)
+	Try(lf.GetDigest(image)) // Check lookup with digested image
 	Check(lf.Verify())
 }
 
