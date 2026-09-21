@@ -412,7 +412,7 @@ func TestAttemptUpgradeWhenSelectivelyEnabled(t *testing.T) {
 	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, imageName)), digests[0])
 	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, upgradeImageName)), digests[1])
 	lf.Updating = true
-	lf.SelectForUpgrade(Try(images.Parse(upgradeImageName)))
+	Check(lf.SelectImagesForUpgrade(upgradeImageName))
 	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
 	digests = getDigests()
 	Check(lf.Verify())

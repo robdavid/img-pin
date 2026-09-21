@@ -74,6 +74,9 @@ type Options struct {
 	useLockfile    bool
 	mustLockfile   bool
 	generateLocks  bool
+	updateLocks    bool
+	pruneLocks     bool
+	updateLocksFor []string
 	noWrite        bool
 	lockFileName   string
 	imageOptions   []images.ImageOption
@@ -123,6 +126,25 @@ func SkipNotFound(o *Options) { o.skipNotFound = true }
 // GenerateLocks tells the digester process to consult registries for digests and update
 // the lock file.
 func GenerateLocks(o *Options) { o.generateLocks = true }
+
+// UpdateAllLocks causes all locked images locks to be updated if their tags have moved
+func UpdateAllLocks(o *Options) {
+	o.updateLocks = true
+	o.updateLocksFor = nil
+}
+
+// UpdateLocks causes the digests of the named images to be updated if their tags have moved. A
+// special case is if the parameter is nil, all images are updated.
+func UpdateLocks(imageNames []string) Option {
+	return func(o *Options) {
+		o.updateLocks = true
+		o.updateLocksFor = imageNames
+	}
+}
+
+// PruneLocks causes locks that are not referenced when images are digested to
+// be deleted when the the lock file is finally re-written.
+func PruneLocks(o *Options) { o.pruneLocks = true }
 
 // UseLockfile makes all digesting or verification use the associated lock file, if it exists. No API
 // calls to registries are made if the lock file exists.
@@ -218,6 +240,7 @@ func (ky *Digester) configureLockfile() error {
 			ky.lockfile = lock.NewLockfile(lockFileName)
 			ky.lockfile.CreateIfMissing = ky.options.generateLocks
 			ky.lockfile.Locking = ky.options.generateLocks
+			ky.lockfile.Updating = ky.options.updateLocks
 			if err := ky.lockfile.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			} else if err != nil && ky.options.mustLockfile {
@@ -263,7 +286,10 @@ func (ky *Digester) LoadStream(input io.Reader) (err error) {
 // Writes the contents of the associated lock file, if any, updating
 // it with the most recent lock values.
 func (ky *Digester) WriteAnyLocks() error {
-	if ky.lockfile != nil && ky.options.generateLocks {
+	if ky.lockfile != nil && (ky.options.generateLocks || ky.options.updateLocks || ky.options.pruneLocks) {
+		if ky.options.pruneLocks {
+			ky.lockfile.Prune()
+		}
 		return ky.lockfile.Save()
 	}
 	return nil

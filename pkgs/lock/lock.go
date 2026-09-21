@@ -10,6 +10,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	. "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/img-pin/pkgs/images"
@@ -183,6 +184,14 @@ func (lf *Lockfile) SelectForUpgrade(images ...*images.Image) {
 	for _, image := range images {
 		lf.UpdateOnly[image.String()] = true
 	}
+}
+
+func (lf *Lockfile) SelectImagesForUpgrade(imageNames ...string) (err error) {
+	defer Catch(&err)
+	lf.SelectForUpgrade(slices.Map(imageNames, func(imageName string) *images.Image {
+		return Try(images.Parse(imageName))
+	})...)
+	return nil
 }
 
 func (lf *Lockfile) SelectAllForUpgrade() {
