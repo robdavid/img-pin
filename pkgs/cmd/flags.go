@@ -79,10 +79,10 @@ func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
 	flag.BoolVarP(&opts.SkipV1Schema, "skip-v1-schema", "V", false, "Skips images that won't digest because they use the old V1 schema")
 	flag.BoolVarP(&opts.StrictParsing, "strict", "s", false, "Use a more strict parser for Dockerfiles (fails on syntax errors)")
 	flag.BoolVarP(&opts.TrimMultiline, "trim-multiline", "T", false, "Trims trailing whitespace from the end of literal multi-line strings")
-	flag.BoolVarP(&opts.UpdateDigests, "update-digests", "u", false, "Update digests for tags that have moved since the last digest was generated (implies --preserve-tags)")
+	flag.BoolVarP(&opts.UpdateDigests, "update-digests", "u", false, "Update digests in Dockerfiles for tags that have moved since the last digest was generated (implies --preserve-tags)")
 	flag.VarP(enum.NewEnumValue(&opts.UpdateMethod), "update-method", "m",
 		"Method for updating re-written YAML files, one of "+strings.Join(enum.AllStrings[types.UpdateMethod](), ", "))
-	flag.BoolVarP(&opts.VerifyDigests, "verify", "v", false, "Verify that all images digests, and that they are within the given age range")
+	flag.BoolVarP(&opts.VerifyDigests, "verify", "v", false, "Verify that all images have digests, and that they conform to policy")
 	flag.BoolVarP(&opts.Yamlfiles, "yaml", "y", false, "Treat arguments as YAML files containing K8S resources to parse")
 	return flag
 }
