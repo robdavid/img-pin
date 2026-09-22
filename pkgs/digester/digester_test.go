@@ -66,7 +66,7 @@ func TestDigest(t *testing.T) {
 		tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
 		images.MockDigest(t, imghelpers.CommonMockDigestFunc)
 		eh.Check(digester.CreateDigests(tempDir.First(),
-			digester.UpdateMethod(types.UpdatePatch), digester.UseLockfile))
+			digester.UpdateMethod(types.UpdatePatch), digester.UseLockFile))
 		content := test.Result(os.ReadFile(tempDir.First())).Must(t)
 		re := regexp.MustCompile(`v2\.11\.1\@sha256:[a-z0-9]{64}`)
 		matches := re.FindAll(content, -1)
@@ -83,7 +83,7 @@ func TestDigest(t *testing.T) {
 
 	testExpansion := func(t *testing.T, assert ass, require req) {
 		tempDir := helpers.CopyToTempDir(t, "tests/harbor.yaml", "tests/harbor.lock.yaml")
-		dig := test.Result(digester.DigestKube(tempDir.First(), digester.UseLockfile)).Must(t)
+		dig := test.Result(digester.DigestKube(tempDir.First(), digester.UseLockFile)).Must(t)
 		assert.Greater(len(dig.Resources), 30)
 		var buffer bytes.Buffer
 		eh.Check(digester.WriteCombinedDigests([]*digester.Digester{dig}, &buffer))

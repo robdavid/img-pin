@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"os"
 	"time"
 
@@ -115,6 +116,26 @@ func New() *Lockfile {
 // cannot [Lockfile.Load] or [Lockfile.Save].
 func Make() Lockfile {
 	return Lockfile{}
+}
+
+// Clone makes a deep copy of the receiver, copying the lock data slice
+// and re-indexing it. If the receiver is nil, nil will be returned.
+func (lf *Lockfile) Clone() *Lockfile {
+	if lf == nil {
+		return nil
+	}
+	newLockfile := &Lockfile{
+		Filename:        lf.Filename,
+		Locking:         lf.Locking,
+		CreateIfMissing: lf.CreateIfMissing,
+		Updating:        lf.Updating,
+		UpdateOnly:      maps.Clone(lf.UpdateOnly),
+		Locks: LockData{
+			Images: slices.Clone(lf.Locks.Images),
+		},
+	}
+	newLockfile.index()
+	return newLockfile
 }
 
 func (lf *Lockfile) index() {

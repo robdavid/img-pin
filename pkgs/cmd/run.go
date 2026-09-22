@@ -62,7 +62,7 @@ func CreateDigestOptions(opts *UserOpts) (imageOptions []images.ImageOption, dig
 
 	digesterOptions = []digester.Option{
 		digester.ImageOptions(imageOptions...),
-		digester.UseLockfile, // If available
+		digester.UseLockFile, // If available
 	}
 	if opts.SkipPostVerify {
 		digesterOptions = append(digesterOptions, digester.SkipPostVerify)
@@ -80,7 +80,7 @@ func CreateDigestOptions(opts *UserOpts) (imageOptions []images.ImageOption, dig
 		digesterOptions = append(digesterOptions, digester.LockFileName(opts.Lockfile), digester.MustLockFile)
 	}
 	if opts.ManagingLocks() {
-		digesterOptions = append(digesterOptions, digester.UseLockfile, digester.NoWrite)
+		digesterOptions = append(digesterOptions, digester.UseLockFile, digester.NoWrite)
 		if opts.Lock {
 			digesterOptions = append(digesterOptions, digester.GenerateLocks)
 		} else {
