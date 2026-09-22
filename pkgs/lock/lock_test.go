@@ -351,11 +351,11 @@ func TestAttemptUpgradeWhenDisabled(t *testing.T) {
 	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
 	lf := lock.Make()
 	lf.Locking = true
-	lf.GetDigest(Try(images.Parse(imageName)))
+	Try(lf.GetDigest(Try(images.Parse(imageName))))
 	require.Equal(1, len(lf.Locks.Images))
 	digest1 := lf.Locks.Images[0].Digest.Get().Digest
 	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
-	lf.GetDigest(Try(images.Parse(imageName)))
+	Try(lf.GetDigest(Try(images.Parse(imageName))))
 	require.Equal(1, len(lf.Locks.Images))
 	digest2 := lf.Locks.Images[0].Digest.Get().Digest
 	assert.Equal(digest1, digest2)
@@ -404,7 +404,7 @@ func TestAttemptUpgradeWhenSelectivelyEnabled(t *testing.T) {
 		testImages := []string{imageName, upgradeImageName}
 		digests := make([]string, len(testImages))
 		for i, imageName := range testImages {
-			lf.GetDigest(Try(images.Parse(imageName)))
+			Try(lf.GetDigest(Try(images.Parse(imageName))))
 			digests[i] = lf.Lookup(Try(images.Parse(imageName))).TryRef().Digest.Try().Digest
 		}
 		return digests

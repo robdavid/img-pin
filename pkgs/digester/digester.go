@@ -241,6 +241,7 @@ func (ky *Digester) configureLockfile() error {
 			ky.lockfile.CreateIfMissing = ky.options.generateLocks
 			ky.lockfile.Locking = ky.options.generateLocks
 			ky.lockfile.Updating = ky.options.updateLocks
+			ky.lockfile.SelectImagesForUpgrade(ky.options.updateLocksFor...)
 			if err := ky.lockfile.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			} else if err != nil && ky.options.mustLockfile {

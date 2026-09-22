@@ -60,6 +60,13 @@ func (id *ImageData) String() string {
 		id.Created, id.UnsupportedSchema)
 }
 
+func (id *ImageData) updateDigest(other *ImageData) {
+	id.Digest = other.Digest
+	id.Created = other.Created
+	id.accessed = other.accessed
+	id.UnsupportedSchema = other.UnsupportedSchema
+}
+
 type LockData struct {
 	Images []ImageData `yaml:"images"`
 }
@@ -230,9 +237,12 @@ func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey stri
 		lf.Index = make(LockIndex)
 	}
 	if lockImage := lf.Index[imageKey]; lockImage != nil {
+		// If digest is empty, deleting a non-existent empty key is a no-op
 		delete(lf.Index, lockImage.Digest.String())
-		*lockImage = imageData
-		lf.Index[imageData.Digest.String()] = lockImage
+		lockImage.updateDigest(&imageData)
+		if dig, ok := imageData.Digest.RefOK(); ok {
+			lf.Index[dig.String()] = lockImage
+		}
 
 	} else {
 		old := lf.Locks.Images
@@ -243,7 +253,9 @@ func (lf *Lockfile) upsert(slog *slog.Logger, image *images.Image, imageKey stri
 		} else {
 			entry := &lf.Locks.Images[len(lf.Locks.Images)-1]
 			lf.Index[imageKey] = entry
-			lf.Index[imageData.Digest.String()] = entry
+			if dig, ok := imageData.Digest.RefOK(); ok {
+				lf.Index[dig.String()] = entry
+			}
 		}
 	}
 	return
