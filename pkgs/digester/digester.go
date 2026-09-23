@@ -207,6 +207,9 @@ func newVerificationDigester(d *Digester) *Digester {
 		v.lockfile.UpdateOnly = nil
 		v.options.pruneLocks = false
 		v.imageDigester = v.lockfile
+		if d.options.pruneLocks {
+			v.lockfile.Prune()
+		}
 	}
 	return &v
 }
