@@ -3,15 +3,18 @@ package helpers
 import (
 	"time"
 
+	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/img-pin/pkgs/images"
 )
 
-var unset time.Time
-var yesterday = time.Now().Add(-time.Hour * 24)
-var past = time.Now().Add(-time.Hour * 20000)
-var crusty = time.Now().Add(-time.Hour * 40000)
-var mkMock = MakeMockDigest
-var errMock = MakeMockDigestErr
+var (
+	unset     time.Time
+	yesterday = time.Now().Add(-time.Hour * 24)
+	past      = time.Now().Add(-time.Hour * 20000)
+	crusty    = time.Now().Add(-time.Hour * 40000)
+	mkMock    = MakeMockDigest
+	errMock   = MakeMockDigestErr
+)
 
 var MutableMockDigests = []MockDigest{
 	mkMock("4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90", past, "docker.io/library/ubuntu:24.04"),
@@ -50,6 +53,15 @@ var CommonMockDigests = []MockDigest{
 	errMock(images.ErrSchemaV1, "quay.io/dexidp/dex:v2.14.0"),
 }
 
-var CommonMockDigestFunc = MockDigestImage(CommonMockDigests)
-var MutableMockDigestsFunc = MockDigestImage(MutableMockDigests)
-var MutableMockDigests2Func = MockDigestImage(MutableMockDigests2)
+var CommonMockDigests2 = slices.Affix(CommonMockDigests,
+	mkMock("6e9c5284a0dac06e84de9f4d97852d2e6513442ee7ec3a66d35009eec86e1e62", yesterday, "docker.io/bitnami/kubectl:latest"),
+	mkMock("69cecf4bbf72d2d44a9eef1b71fb98c7fb973d78af11399deccef19beb008ad9", yesterday, "docker.io/library/ubuntu:24.04"),
+	mkMock("ee1cc82e775c18da7c1e5e01cf10a67b8cfb6e65c4cfcae17cdb5bbc0af2496a", yesterday, "docker.io/openpolicyagent/gatekeeper:dev"),
+)
+
+var (
+	CommonMockDigestFunc    = MockDigestImage(CommonMockDigests)
+	CommonMockDigest2Func   = MockDigestImage(CommonMockDigests2)
+	MutableMockDigestsFunc  = MockDigestImage(MutableMockDigests)
+	MutableMockDigests2Func = MockDigestImage(MutableMockDigests2)
+)
