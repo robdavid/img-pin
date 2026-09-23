@@ -20,7 +20,7 @@ import (
 var (
 	ErrImageNoLock = errors.New("no lock info found for image")
 	ErrNoFileName  = errors.New("lock file has no file name")
-	ErrVerify      = errors.New("internal verification error")
+	ErrVerify      = errors.New("lock file internal verification error")
 )
 
 type Time struct {

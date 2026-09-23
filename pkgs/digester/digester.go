@@ -311,6 +311,9 @@ func (ky *Digester) LoadStream(input io.Reader) (err error) {
 // it with the most recent lock values.
 func (ky *Digester) WriteAnyLocks() error {
 	if ky.lockfile != nil && (ky.options.generateLocks || ky.options.updateLocks || ky.options.pruneLocks) {
+		if err := ky.lockfile.Verify(); err != nil {
+			return err
+		}
 		if ky.options.pruneLocks {
 			ky.lockfile.Prune()
 		}
