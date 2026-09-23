@@ -16,31 +16,39 @@ import (
 )
 
 type UserOpts struct {
-	Yamlfiles      bool
-	Dockerfiles    bool
-	KubeExpand     bool
-	DumpCrds       bool
-	SkipAuth       bool
-	SkipPostVerify bool
-	SkipNotFound   bool
-	SkipV1Schema   bool
-	IncludeTag     bool
-	VerifyDigests  bool
-	UpdateDigests  bool
-	LaxParsing     bool
-	StrictParsing  bool
-	CountRequests  bool
-	BatchMode      bool
-	TrimMultiline  bool
-	Lockfile       string
-	Lock           bool
-	Help           bool
-	Policies       []string
-	UpdateMethod   types.UpdateMethod
-	Image          bool
-	FileDesc       string
-	MinAge         time.Duration
-	LogLevel       slog.Level
+	Yamlfiles        bool
+	Dockerfiles      bool
+	KubeExpand       bool
+	DumpCrds         bool
+	SkipAuth         bool
+	SkipPostVerify   bool
+	SkipNotFound     bool
+	SkipV1Schema     bool
+	IncludeTag       bool
+	VerifyDigests    bool
+	UpdateDigests    bool
+	LaxParsing       bool
+	StrictParsing    bool
+	CountRequests    bool
+	BatchMode        bool
+	TrimMultiline    bool
+	Lockfile         string
+	Lock             bool
+	LockUpdate       bool
+	LockUpdateImages []string
+	LockPrune        bool
+	Help             bool
+	Policies         []string
+	UpdateMethod     types.UpdateMethod
+	Image            bool
+	FileDesc         string
+	MinAge           time.Duration
+	LogLevel         slog.Level
+}
+
+// ManagingLocks returns true if any lock management option has been issued
+func (opts *UserOpts) ManagingLocks() bool {
+	return opts.Lock || opts.LockUpdate || len(opts.LockUpdateImages) > 0 || opts.LockPrune
 }
 
 func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
@@ -57,6 +65,9 @@ func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
 	flag.BoolVarP(&opts.LaxParsing, "lax", "l", false, "Use a more permissive regex-based parser for Dockerfiles (works with templated files)")
 	flag.BoolVarP(&opts.Lock, "lock", "k", false, "Generate/update lock file")
 	flag.StringVarP(&opts.Lockfile, "lock-file", "f", "", "The name of the lock file to use")
+	flag.BoolVarP(&opts.LockUpdate, "lock-update", "U", false, "Update locked images")
+	flag.StringSliceVarP(&opts.LockUpdateImages, "lock-update-images", "I", nil, "Update locks for specified images")
+	flag.BoolVarP(&opts.LockPrune, "lock-prune", "R", false, "Prune lock file of unused images")
 	flag.VarP(clilog.MakeLevelFlag(&opts.LogLevel), "log-level", "L", "Set log level")
 	flag.DurationVarP(&opts.MinAge, "min-age", "A", 0, "Minimum build age of the image")
 	flag.StringSliceVarP(&opts.Policies, "policy", "p", []string{},
@@ -68,10 +79,10 @@ func FlagSet(opts *UserOpts, handling pflag.ErrorHandling) *pflag.FlagSet {
 	flag.BoolVarP(&opts.SkipV1Schema, "skip-v1-schema", "V", false, "Skips images that won't digest because they use the old V1 schema")
 	flag.BoolVarP(&opts.StrictParsing, "strict", "s", false, "Use a more strict parser for Dockerfiles (fails on syntax errors)")
 	flag.BoolVarP(&opts.TrimMultiline, "trim-multiline", "T", false, "Trims trailing whitespace from the end of literal multi-line strings")
-	flag.BoolVarP(&opts.UpdateDigests, "update-digests", "u", false, "Update digests for tags that have moved since the last digest was generated (implies --preserve-tags)")
+	flag.BoolVarP(&opts.UpdateDigests, "update-digests", "u", false, "Update digests in Dockerfiles for tags that have moved since the last digest was generated (implies --preserve-tags)")
 	flag.VarP(enum.NewEnumValue(&opts.UpdateMethod), "update-method", "m",
 		"Method for updating re-written YAML files, one of "+strings.Join(enum.AllStrings[types.UpdateMethod](), ", "))
-	flag.BoolVarP(&opts.VerifyDigests, "verify", "v", false, "Verify that all images digests, and that they are within the given age range")
+	flag.BoolVarP(&opts.VerifyDigests, "verify", "v", false, "Verify that all images have digests, and that they conform to policy")
 	flag.BoolVarP(&opts.Yamlfiles, "yaml", "y", false, "Treat arguments as YAML files containing K8S resources to parse")
 	return flag
 }

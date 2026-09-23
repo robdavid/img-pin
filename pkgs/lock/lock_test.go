@@ -14,6 +14,7 @@ import (
 	"github.com/robdavid/genutil-go/opt"
 	"github.com/robdavid/img-pin/pkgs/images"
 	imghelpers "github.com/robdavid/img-pin/pkgs/images/test/helpers"
+	"github.com/robdavid/img-pin/pkgs/internal/test/helpers"
 	"github.com/robdavid/img-pin/pkgs/lock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,6 +62,7 @@ func TestLoadSuccess(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(lf.Index)
 	assert.Equal(1, len(lf.Locks.Images))
+	Check(lf.Verify())
 
 	img := lf.Locks.Images[0]
 	assert.Equal("library/ubuntu:latest", img.Source.String())
@@ -84,6 +86,7 @@ func TestLoadMissingFile(t *testing.T) {
 	err := lf.Load()
 	require.Error(err)
 	assert.True(os.IsNotExist(err))
+	require.NoError(lf.Verify())
 }
 
 func TestLoadCreateIfMissing(t *testing.T) {
@@ -240,6 +243,8 @@ func TestDigestLockAndVerification(t *testing.T) {
 	_, err = lf.GetDigest(img, images.RequestCount(counters), images.IncludeTag)
 	require.ErrorIs(err, lock.ErrImageNoLock)
 
+	require.NoError(lf.Verify())
+
 }
 
 // TestLockPredigested asserts behavior when locking an image name that already
@@ -332,4 +337,119 @@ func TestGetDigest_SkippedByPolicy(t *testing.T) {
 	assert.NotContains(yaml, "digest:")
 	buf := bytes.NewBuffer(out)
 	io.Copy(os.Stdout, buf)
+}
+
+// TestAttemptUpgradeWhenDisabled attempts to updated a lock when lock updates
+// are not enabled, and asserts it does not occur.
+func TestAttemptUpgradeWhenDisabled(t *testing.T) {
+	defer test.ReportErr(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	const imageName = "ubuntu:24.04"
+
+	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
+	lf := lock.Make()
+	lf.Locking = true
+	Try(lf.GetDigest(Try(images.Parse(imageName))))
+	require.Equal(1, len(lf.Locks.Images))
+	digest1 := lf.Locks.Images[0].Digest.Get().Digest
+	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
+	Try(lf.GetDigest(Try(images.Parse(imageName))))
+	require.Equal(1, len(lf.Locks.Images))
+	digest2 := lf.Locks.Images[0].Digest.Get().Digest
+	assert.Equal(digest1, digest2)
+	Check(lf.Verify())
+}
+
+func TestAttemptUpgradeWhenEnabled(t *testing.T) {
+	defer test.ReportErr(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	const imageName = "ubuntu:24.04"
+	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
+	lf := lock.Make()
+	lf.Locking = true
+	image := Try(images.Parse(imageName))
+	Try(lf.GetDigest(image))
+	require.Equal(1, len(lf.Locks.Images))
+	digest1 := lf.Locks.Images[0].Digest.Get().Digest
+	expectedDigest1 := "sha256:" + Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, imageName))
+	assert.Equal(expectedDigest1, digest1)
+	Try(lf.GetDigest(image)) // Check lookup with digested image
+	lf.Updating = true
+	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
+	image = Try(images.Parse(imageName))
+	Try(lf.GetDigest(image))
+	require.Equal(1, len(lf.Locks.Images))
+	digest2 := lf.Locks.Images[0].Digest.Get().Digest
+	assert.NotEqual(digest1, digest2)
+	expectedDigest2 := "sha256:" + Try(imghelpers.FindDigest(imghelpers.MutableMockDigests2, imageName))
+	assert.Equal(expectedDigest2, digest2)
+	Try(lf.GetDigest(image)) // Check lookup with digested image
+	Check(lf.Verify())
+}
+
+func TestAttemptUpgradeWhenSelectivelyEnabled(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+
+	const imageName = "ubuntu:24.04"
+	const upgradeImageName = "debian:stable"
+
+	lf := lock.Make()
+
+	getDigests := func() []string {
+		testImages := []string{imageName, upgradeImageName}
+		digests := make([]string, len(testImages))
+		for i, imageName := range testImages {
+			Try(lf.GetDigest(Try(images.Parse(imageName))))
+			digests[i] = lf.Lookup(Try(images.Parse(imageName))).TryRef().Digest.Try().Digest
+		}
+		return digests
+	}
+	lf.Locking = true
+	images.MockDigest(t, imghelpers.MutableMockDigestsFunc)
+	digests := getDigests()
+	Check(lf.Verify())
+	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, imageName)), digests[0])
+	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, upgradeImageName)), digests[1])
+	lf.Updating = true
+	Check(lf.SelectImagesForUpgrade(upgradeImageName))
+	images.MockDigest(t, imghelpers.MutableMockDigests2Func)
+	digests = getDigests()
+	Check(lf.Verify())
+	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests, imageName)), digests[0])
+	assert.Equal("sha256:"+Try(imghelpers.FindDigest(imghelpers.MutableMockDigests2, upgradeImageName)), digests[1])
+}
+
+func TestPrune(t *testing.T) {
+	defer test.ReportErr(t)
+	assert := assert.New(t)
+	imageNames := []string{"ubuntu:24.04", "alpine:3.18", "hashicorp/vault:1.13.3"}
+	lockfile := helpers.CreateTemp(t, ".lock.yaml")
+
+	images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+	lf := lock.NewLockfile(lockfile)
+
+	lf.Locking = true
+	for _, imageName := range imageNames {
+		Try(lf.GetDigest(Try(images.Parse(imageName))))
+	}
+
+	Check(lf.Save())
+
+	lf2 := lock.NewLockfile(lockfile)
+	Check(lf2.Load())
+
+	assert.Equal(len(imageNames), len(lf2.Locks.Images))
+	Check(lf2.Verify())
+
+	Try(lf2.GetDigest(Try(images.Parse(imageNames[0]))))
+	lf2.Prune()
+
+	assert.Equal(1, len(lf2.Locks.Images))
+	Check(lf2.Verify())
+
 }

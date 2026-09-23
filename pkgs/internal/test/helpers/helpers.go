@@ -4,14 +4,26 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/robdavid/genutil-go/errors/handler"
 )
 
+func CreateTemp(t *testing.T, ext string) string {
+	defer Handle(func(e error) {
+		t.Skipf("Cannot create temp file for ext %q: %s", ext, e)
+	})
+	name := strings.ReplaceAll(t.Name(), "/", "__")
+	dst := Try(os.CreateTemp("", name+"-*.tmp"+ext))
+	dst.Close()
+	t.Cleanup(func() { os.Remove(dst.Name()) })
+	return dst.Name()
+}
+
 func CopyToTemp(t *testing.T, filename string) string {
 	defer Handle(func(e error) {
-		t.Skipf("Cannot create temp file for %s: %s", filename, e)
+		t.Skipf("Cannot create temp file for %s: %q", filename, e)
 	})
 	src := Try(os.Open(filename))
 	defer src.Close()

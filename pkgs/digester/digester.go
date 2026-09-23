@@ -74,6 +74,9 @@ type Options struct {
 	useLockfile    bool
 	mustLockfile   bool
 	generateLocks  bool
+	updateLocks    bool
+	pruneLocks     bool
+	updateLocksFor []string
 	noWrite        bool
 	lockFileName   string
 	imageOptions   []images.ImageOption
@@ -81,6 +84,10 @@ type Options struct {
 
 func (o *Options) ImageOptions() []images.ImageOption { return o.imageOptions }
 
+// Option is a [Digester] option defining function. Available options include:
+// [UpdateMethod],  [ImageOptions], [SkipPostVerify], [TrimMultiline], [SkipNotFound],
+// [GenerateLocks], [UpdateLocks], [UpdateAllLocks], [PruneLocks], [UseLockFile],
+// [MustLockFile], [LockFileName] and [NoWrite]
 type Option func(*Options)
 
 func (o *Options) apply(options []Option) {
@@ -124,9 +131,28 @@ func SkipNotFound(o *Options) { o.skipNotFound = true }
 // the lock file.
 func GenerateLocks(o *Options) { o.generateLocks = true }
 
-// UseLockfile makes all digesting or verification use the associated lock file, if it exists. No API
+// UpdateAllLocks causes all locked images locks to be updated if their tags have moved
+func UpdateAllLocks(o *Options) {
+	o.updateLocks = true
+	o.updateLocksFor = nil
+}
+
+// UpdateLocks causes the digests of the named images to be updated if their tags have moved. A
+// special case is if the parameter is nil, all images are updated.
+func UpdateLocks(imageNames []string) Option {
+	return func(o *Options) {
+		o.updateLocks = true
+		o.updateLocksFor = imageNames
+	}
+}
+
+// PruneLocks causes locks that are not referenced when images are digested to
+// be deleted when the the lock file is finally re-written.
+func PruneLocks(o *Options) { o.pruneLocks = true }
+
+// UseLockFile makes all digesting or verification use the associated lock file, if it exists. No API
 // calls to registries are made if the lock file exists.
-func UseLockfile(o *Options) { o.useLockfile = true }
+func UseLockFile(o *Options) { o.useLockfile = true }
 
 // MustLockFile raises an error if [UseLockFile] is specified and there is no lock file present.
 func MustLockFile(o *Options) { o.mustLockfile = true }
@@ -157,6 +183,7 @@ type Digester struct {
 	imageDigester ImageDigester
 }
 
+// NewDigester creates a new [Digester] with the specified [Option]s
 func NewDigester(options ...Option) *Digester {
 	y := Digester{}
 	y.options.apply(options)
@@ -164,16 +191,32 @@ func NewDigester(options ...Option) *Digester {
 	return &y
 }
 
-func NewVerificationDigester(d *Digester) *Digester {
+// newVerificationDigester creates a [Digester] whose purpose to provide verification
+// for digester passed in the parameter.
+func newVerificationDigester(d *Digester) *Digester {
 	v := Digester{}
 	v.options = d.options
 	v.skipped = d.skipped
 	v.Filename = "(" + d.Filename + " buffer)"
-	v.imageDigester = d.imageDigester
+	v.lockfile = d.lockfile.Clone()
+	if v.lockfile == nil {
+		v.imageDigester = NonLockingImageDigester{}
+	} else {
+		v.lockfile.Locking = false
+		v.lockfile.Updating = false
+		v.lockfile.UpdateOnly = nil
+		v.options.pruneLocks = false
+		v.imageDigester = v.lockfile
+		if d.options.pruneLocks {
+			v.lockfile.Prune()
+		}
+	}
 	return &v
 }
 
-func NewSubDigester(d *Digester) *Digester {
+// newSubDigester creates a [Digester] which is to be embedded as a resource within a parent
+// [Digester]. This is achieved via [DigesterResource].
+func newSubDigester(d *Digester) *Digester {
 	v := Digester{}
 	v.options = d.options
 	v.skipped = d.skipped
@@ -218,7 +261,11 @@ func (ky *Digester) configureLockfile() error {
 			ky.lockfile = lock.NewLockfile(lockFileName)
 			ky.lockfile.CreateIfMissing = ky.options.generateLocks
 			ky.lockfile.Locking = ky.options.generateLocks
-			if err := ky.lockfile.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			ky.lockfile.Updating = ky.options.updateLocks
+			if err := ky.lockfile.SelectImagesForUpgrade(ky.options.updateLocksFor...); err != nil {
+				return err
+			}
+			if err = ky.lockfile.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			} else if err != nil && ky.options.mustLockfile {
 				return err
@@ -263,7 +310,13 @@ func (ky *Digester) LoadStream(input io.Reader) (err error) {
 // Writes the contents of the associated lock file, if any, updating
 // it with the most recent lock values.
 func (ky *Digester) WriteAnyLocks() error {
-	if ky.lockfile != nil && ky.options.generateLocks {
+	if ky.lockfile != nil && (ky.options.generateLocks || ky.options.updateLocks || ky.options.pruneLocks) {
+		if err := ky.lockfile.Verify(); err != nil {
+			return err
+		}
+		if ky.options.pruneLocks {
+			ky.lockfile.Prune()
+		}
 		return ky.lockfile.Save()
 	}
 	return nil
@@ -294,7 +347,7 @@ nextDoc:
 		}
 		for _, reg := range registry {
 			if K8S_LIST.Match(doc) {
-				subD := NewSubDigester(ky)
+				subD := newSubDigester(ky)
 				listRes := DigesterResource{digester: subD}
 				Check(listRes.Load(doc))
 				ky.Resources[n] = listRes
@@ -521,7 +574,7 @@ func CreateDigests(filename string, options ...Option) (err error) {
 			defer original.Close()
 		}
 		Check(digester.WriteUsingMethod(original, &buffer))
-		verifier := NewVerificationDigester(digester)
+		verifier := newVerificationDigester(digester)
 		defer verifier.Cleanup()
 		slog.Debug("{{.file}}: performing verification pass")
 		Check(verifier.read(&buffer))

@@ -3,9 +3,11 @@ package helpers
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
+	. "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/img-pin/pkgs/images"
 )
 
@@ -113,4 +115,16 @@ func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 
 		return
 	}
+}
+
+func FindDigest(digests []MockDigest, image string) (digest string, err error) {
+	defer Catch(&err)
+	imageName := Try(images.Parse(image)).String()
+	for i := range digests {
+		dig := &digests[i]
+		if slices.Contains(dig.Sources, imageName) {
+			return dig.Digest, nil
+		}
+	}
+	return "", fmt.Errorf("image %q not found", imageName)
 }
