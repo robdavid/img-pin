@@ -171,7 +171,20 @@ func TestDigestLockUpdate(t *testing.T) {
 			testFn(t, assert.New(t), require.New(t), 2, imghelpers.CommonMockDigest2Func)
 		}
 	}
-	run := func(testFn testFn) func(*testing.T) { return runner(runhelpers.ScriptModeCapture, "", testFn) }
+	run := func(testFn testFn) func(*testing.T) { return runner(runhelpers.ScriptModeAuto, "", testFn) }
+	compareLock := func(t *testing.T, imageName string, lockFile string, digests images.DigestFunc) {
+		var lockData lock.LockData
+		t.Helper()
+		image := test.Result(images.Parse(imageName)).Must(t)
+		lockText := test.Result(os.ReadFile(lockFile)).Must(t)
+		test.Check(t, yaml.Unmarshal(lockText, &lockData))
+		ki := slices.FindUsingRef(lockData.Images, func(ld *lock.ImageData) bool { return *image == ld.Source })
+		require.GreaterOrEqual(t, ki, 0, "image %q not found in lockfile", imageName)
+		digest, ok := lockData.Images[ki].Digest.RefOK()
+		require.True(t, ok, "image %q does not have a digest in the lockfile", imageName)
+		expected := test.Result(imghelpers.LookupDigest(digests, imageName)).Must(t)
+		assert.Equal(t, expected, digest.Digest, "lockfile digest does not match expected mock")
+	}
 
 	t.Run("test lock file image update", run(func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc) {
 		tempDir := helpers.CopyToTempDir(t, "tests/akri.yaml", "tests/akri.lock.yaml")
@@ -179,7 +192,7 @@ func TestDigestLockUpdate(t *testing.T) {
 		lockFile := filepath.Join(tempDir.Dir, "akri.lock.yaml")
 		var dig *digester.Digester
 		var buffer bytes.Buffer
-		var lockData lock.LockData
+		//var lockData lock.LockData
 		switch iteration {
 		case 1:
 			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile))).Must(t)
@@ -187,16 +200,44 @@ func TestDigestLockUpdate(t *testing.T) {
 			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile), digester.UpdateAllLocks)).Must(t)
 		}
 		dig.Write(&buffer)
-		lockText := test.Result(os.ReadFile(lockFile)).Must(t)
-		test.Check(t, yaml.Unmarshal(lockText, &lockData))
-		ki := slices.FindUsingRef(lockData.Images, func(ld *lock.ImageData) bool {
-			return ld.Source.Registry == "docker.io" && ld.Source.Repository == "bitnami/kubectl" && ld.Source.Tag == "latest"
-		})
-		require.GreaterOrEqual(ki, 0)
-		digest, ok := lockData.Images[ki].Digest.RefOK()
-		require.True(ok)
-		expected := test.Result(imghelpers.LookupDigest(digests, "docker.io/bitnami/kubectl:latest")).Must(t)
-		assert.Equal(expected, digest.Digest)
+		compareLock(t, "docker.io/bitnami/kubectl:latest", lockFile, digests)
+	}))
+
+	t.Run("test lock file named image update", run(func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc) {
+		tempDir := helpers.CopyToTempDir(t, "tests/akri.yaml", "tests/akri.lock.yaml")
+		yamlFile := filepath.Join(tempDir.Dir, "akri.yaml")
+		lockFile := filepath.Join(tempDir.Dir, "akri.lock.yaml")
+		var dig *digester.Digester
+		var buffer bytes.Buffer
+		//var lockData lock.LockData
+		switch iteration {
+		case 1:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile))).Must(t)
+		case 2:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile),
+				digester.UpdateLocks(slices.New("bitnami/kubectl")))).Must(t)
+		}
+		dig.Write(&buffer)
+		compareLock(t, "docker.io/bitnami/kubectl:latest", lockFile, digests)
+	}))
+
+	t.Run("test lock file named other image update", run(func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc) {
+		tempDir := helpers.CopyToTempDir(t, "tests/akri.yaml", "tests/akri.lock.yaml")
+		yamlFile := filepath.Join(tempDir.Dir, "akri.yaml")
+		lockFile := filepath.Join(tempDir.Dir, "akri.lock.yaml")
+		var dig *digester.Digester
+		var buffer bytes.Buffer
+		//var lockData lock.LockData
+		switch iteration {
+		case 1:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile))).Must(t)
+		case 2:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile),
+				digester.UpdateLocks(slices.New("ghcr.io/project-akri/akri/agent:v0.13.8")))).Must(t)
+		}
+		dig.Write(&buffer)
+		compareLock(t, "docker.io/bitnami/kubectl:latest", lockFile, imghelpers.CommonMockDigestFunc)
+		compareLock(t, "ghcr.io/project-akri/akri/agent:v0.13.8", lockFile, imghelpers.CommonMockDigestFunc)
 	}))
 
 }
