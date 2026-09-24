@@ -53,7 +53,7 @@ func MakeMockDigestErr(err error, sources ...string) MockDigest {
 
 const sha256Prefix = "sha256:"
 
-func MockDigestImage(mocks []MockDigest) images.DigestFunc {
+func indexMockDigests(mocks []MockDigest) map[string]*MockDigest {
 	digestMap := make(map[string]*MockDigest)
 	for m := range mocks {
 		mock := &mocks[m]
@@ -66,6 +66,11 @@ func MockDigestImage(mocks []MockDigest) images.DigestFunc {
 			}
 		}
 	}
+	return digestMap
+}
+
+func MockDigestImage(mocks []MockDigest) images.DigestFunc {
+	digestMap := indexMockDigests(mocks)
 	return func(image string, opts *images.ImageOptions) (digested string, digest string, created time.Time, err error) {
 		defer func() {
 			if err != nil {
@@ -127,4 +132,9 @@ func FindDigest(digests []MockDigest, image string) (digest string, err error) {
 		}
 	}
 	return "", fmt.Errorf("image %q not found", imageName)
+}
+
+func LookupDigest(f images.DigestFunc, image string) (digest string, err error) {
+	_, digest, _, err = f(image, &images.ImageOptions{})
+	return
 }

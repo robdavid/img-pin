@@ -91,9 +91,15 @@ func ArgsCompare(args1, args2 []string, index int) bool {
 type ScriptMode int
 
 const (
+	// ScriptModeRun indicates an existing script file is to be run
 	ScriptModeRun ScriptMode = iota
+	// ScriptModeCapture indicates that real commands are to be issued, and the
+	// results recorded to a script file.
 	ScriptModeCapture
+	// ScriptModeEmpty is equivalent to having an empty script.
 	ScriptModeEmpty
+	// ScriptModeAuto will equate to [ScriptModeRun] if the script file exists, other
+	// wise it will be [ScriptModeCapture]
 	ScriptModeAuto
 )
 

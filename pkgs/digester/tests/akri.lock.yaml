@@ -1,0 +1,61 @@
+images:
+    - source:
+        registry: ghcr.io
+        repository: project-akri/akri/agent
+        tag: v0.13.8
+      digest:
+        registry: ghcr.io
+        repository: project-akri/akri/agent
+        tag: v0.13.8
+        digest: sha256:4554f7ce1cbf453834e79838459f4f7d7036bb70cedad3bd5427eed21c585d3d
+      created: "2024-11-20T22:21:49Z"
+    - source:
+        registry: ghcr.io
+        repository: project-akri/akri/udev-discovery
+        tag: v0.13.8
+      digest:
+        registry: ghcr.io
+        repository: project-akri/akri/udev-discovery
+        tag: v0.13.8
+        digest: sha256:d7a84771026fa49d94f7fcd62472e9ff7df97175a6a11669ce65c796a37fbe84
+      created: "2024-11-20T22:31:18Z"
+    - source:
+        registry: ghcr.io
+        repository: project-akri/akri/controller
+        tag: v0.13.8
+      digest:
+        registry: ghcr.io
+        repository: project-akri/akri/controller
+        tag: v0.13.8
+        digest: sha256:003d1ab2f83eaf3969e0f689d523fc6d10d227dfbdd71b782a90ec729a72b615
+      created: "2024-11-20T22:31:32Z"
+    - source:
+        registry: ghcr.io
+        repository: project-akri/akri/webhook-configuration
+        tag: v0.13.8
+      digest:
+        registry: ghcr.io
+        repository: project-akri/akri/webhook-configuration
+        tag: v0.13.8
+        digest: sha256:6df09c63839ac3f0626ca4f8ad6cce9e4fbd2eb444e9392eff6c27eae86c1ec9
+      created: "2024-11-20T22:31:21Z"
+    - source:
+        registry: docker.io
+        repository: bitnami/kubectl
+        tag: latest
+      digest:
+        registry: docker.io
+        repository: bitnami/kubectl
+        tag: latest
+        digest: sha256:95de17e6eb92da83a58c90a9df0c4cede634f898d2e6b92ea04f4a6ee6ace08d
+      created: "2026-09-01T13:38:17Z"
+    - source:
+        registry: registry.k8s.io
+        repository: ingress-nginx/kube-webhook-certgen
+        tag: v1.1.1
+      digest:
+        registry: registry.k8s.io
+        repository: ingress-nginx/kube-webhook-certgen
+        tag: v1.1.1
+        digest: sha256:64d8c73dca984af206adf9d6d7e46aa550362b1d7a01f3a0a91b20cc67868660
+      created: "2021-10-12T17:20:42Z"

@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 	"time"
 
 	eh "github.com/robdavid/genutil-go/errors/handler"
 	"github.com/robdavid/genutil-go/errors/test"
+	"github.com/robdavid/genutil-go/slices"
 	"github.com/robdavid/img-pin/pkgs/digester"
 	"github.com/robdavid/img-pin/pkgs/digester/types"
 	"github.com/robdavid/img-pin/pkgs/images"
@@ -19,10 +21,12 @@ import (
 	_ "github.com/robdavid/img-pin/pkgs/k8s/k3s"
 	"github.com/robdavid/img-pin/pkgs/k8s/kube"
 	_ "github.com/robdavid/img-pin/pkgs/k8s/workload"
+	"github.com/robdavid/img-pin/pkgs/lock"
 	runhelpers "github.com/robdavid/img-pin/pkgs/run/test/helpers"
 	yu "github.com/robdavid/img-pin/pkgs/yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestDigest(t *testing.T) {
@@ -142,4 +146,98 @@ func TestDigest(t *testing.T) {
 		require.NoError(dig.Write(&output))
 		assert.Contains(output.String(), "docker.io/openpolicyagent/gatekeeper:dev@sha256:c64a643dd665db62c43aa089432eb2e74b13364c616fc12ca524baead6ccc332")
 	}))
+}
+
+func TestDigestLockUpdate(t *testing.T) {
+
+	type ass = *assert.Assertions
+	type req = *require.Assertions
+	type testFn = func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc)
+	runner := func(mode runhelpers.ScriptMode, kubeVersion string, testFn testFn) func(t *testing.T) {
+		return func(t *testing.T) {
+			defer test.ReportErr(t)
+			k3s.HelmBinary.Unset()
+			kube.KubeVersion.Unset()
+			os.Setenv(kube.KubeVersion.Env, kubeVersion)
+			defer os.Unsetenv(kube.KubeVersion.Env)
+			runhelpers.Script(t, runhelpers.ScriptOpts{
+				OutputFile: "tests/run-*.json",
+				ArgCompare: runhelpers.ArgsCompare,
+				Mode:       mode,
+			})
+			images.MockDigest(t, imghelpers.CommonMockDigestFunc)
+			testFn(t, assert.New(t), require.New(t), 1, imghelpers.CommonMockDigestFunc)
+			images.MockDigest(t, imghelpers.CommonMockDigest2Func)
+			testFn(t, assert.New(t), require.New(t), 2, imghelpers.CommonMockDigest2Func)
+		}
+	}
+	run := func(testFn testFn) func(*testing.T) { return runner(runhelpers.ScriptModeAuto, "", testFn) }
+	compareLock := func(t *testing.T, imageName string, lockFile string, digests images.DigestFunc) {
+		var lockData lock.LockData
+		t.Helper()
+		image := test.Result(images.Parse(imageName)).Must(t)
+		lockText := test.Result(os.ReadFile(lockFile)).Must(t)
+		test.Check(t, yaml.Unmarshal(lockText, &lockData))
+		ki := slices.FindUsingRef(lockData.Images, func(ld *lock.ImageData) bool { return *image == ld.Source })
+		require.GreaterOrEqual(t, ki, 0, "image %q not found in lockfile", imageName)
+		digest, ok := lockData.Images[ki].Digest.RefOK()
+		require.True(t, ok, "image %q does not have a digest in the lockfile", imageName)
+		expected := test.Result(imghelpers.LookupDigest(digests, imageName)).Must(t)
+		assert.Equal(t, expected, digest.Digest, "lockfile digest does not match expected mock")
+	}
+
+	t.Run("test lock file image update", run(func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc) {
+		tempDir := helpers.CopyToTempDir(t, "tests/akri.yaml", "tests/akri.lock.yaml")
+		yamlFile := filepath.Join(tempDir.Dir, "akri.yaml")
+		lockFile := filepath.Join(tempDir.Dir, "akri.lock.yaml")
+		var dig *digester.Digester
+		var buffer bytes.Buffer
+		//var lockData lock.LockData
+		switch iteration {
+		case 1:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile))).Must(t)
+		case 2:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile), digester.UpdateAllLocks)).Must(t)
+		}
+		dig.Write(&buffer)
+		compareLock(t, "docker.io/bitnami/kubectl:latest", lockFile, digests)
+	}))
+
+	t.Run("test lock file named image update", run(func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc) {
+		tempDir := helpers.CopyToTempDir(t, "tests/akri.yaml", "tests/akri.lock.yaml")
+		yamlFile := filepath.Join(tempDir.Dir, "akri.yaml")
+		lockFile := filepath.Join(tempDir.Dir, "akri.lock.yaml")
+		var dig *digester.Digester
+		var buffer bytes.Buffer
+		//var lockData lock.LockData
+		switch iteration {
+		case 1:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile))).Must(t)
+		case 2:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile),
+				digester.UpdateLocks(slices.New("bitnami/kubectl")))).Must(t)
+		}
+		dig.Write(&buffer)
+		compareLock(t, "docker.io/bitnami/kubectl:latest", lockFile, digests)
+	}))
+
+	t.Run("test lock file named other image update", run(func(t *testing.T, assert ass, require req, iteration int, digests images.DigestFunc) {
+		tempDir := helpers.CopyToTempDir(t, "tests/akri.yaml", "tests/akri.lock.yaml")
+		yamlFile := filepath.Join(tempDir.Dir, "akri.yaml")
+		lockFile := filepath.Join(tempDir.Dir, "akri.lock.yaml")
+		var dig *digester.Digester
+		var buffer bytes.Buffer
+		//var lockData lock.LockData
+		switch iteration {
+		case 1:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile))).Must(t)
+		case 2:
+			dig = test.Result(digester.DigestKube(yamlFile, digester.UseLockFile, digester.LockFileName(lockFile),
+				digester.UpdateLocks(slices.New("ghcr.io/project-akri/akri/agent:v0.13.8")))).Must(t)
+		}
+		dig.Write(&buffer)
+		compareLock(t, "docker.io/bitnami/kubectl:latest", lockFile, imghelpers.CommonMockDigestFunc)
+		compareLock(t, "ghcr.io/project-akri/akri/agent:v0.13.8", lockFile, imghelpers.CommonMockDigestFunc)
+	}))
+
 }
