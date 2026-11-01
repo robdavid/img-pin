@@ -32,7 +32,7 @@ type DigesterResource struct {
 	digester *Digester
 }
 
-func (dr DigesterResource) Load(doc *yaml.Node) error {
+func (dr DigesterResource) Load(doc *yaml.Node, baseDirectory string) error {
 	const items = "items"
 	optNode := yu.GetNode(doc, items)
 	if optNode.IsEmpty() {

@@ -46,7 +46,7 @@ type SimpleResource struct {
 	Node *yaml.Node
 }
 
-func (r *SimpleResource) Load(node *yaml.Node) error {
+func (r *SimpleResource) Load(node *yaml.Node, baseDirectory string) error {
 	r.Node = node
 	return nil
 }
@@ -174,6 +174,7 @@ func NoWrite(o *Options) { o.noWrite = true }
 // Digester consumes YAML resources and updates any image names with their pinned equivalents.
 type Digester struct {
 	Filename      string
+	BaseDirectory string
 	options       Options
 	Resources     []types.Resource
 	Docs          []*yaml.Node
@@ -198,6 +199,7 @@ func newVerificationDigester(d *Digester) *Digester {
 	v.options = d.options
 	v.skipped = d.skipped
 	v.Filename = "(" + d.Filename + " buffer)"
+	v.BaseDirectory = d.BaseDirectory
 	v.lockfile = d.lockfile.Clone()
 	if v.lockfile == nil {
 		v.imageDigester = NonLockingImageDigester{}
@@ -221,6 +223,7 @@ func newSubDigester(d *Digester) *Digester {
 	v.options = d.options
 	v.skipped = d.skipped
 	v.Filename = d.Filename
+	v.BaseDirectory = d.BaseDirectory
 	v.imageDigester = d.imageDigester
 	return &v
 }
@@ -287,10 +290,14 @@ func (ky *Digester) configureLockfile() error {
 func (ky *Digester) LoadFile(filename string) (err error) {
 	defer Catch(&err)
 	ky.Filename = filename
-	Check(ky.configureLockfile())
 	if filename == "-" {
+		ky.BaseDirectory = Try(os.Getwd())
+		Check(ky.configureLockfile())
 		Check(ky.read(os.Stdin))
 	} else {
+		abs := Try(filepath.Abs(filename))
+		ky.BaseDirectory = filepath.Dir(abs)
+		Check(ky.configureLockfile())
 		input := Try(os.Open(filename))
 		defer input.Close()
 		Check(ky.read(input))
@@ -302,6 +309,7 @@ func (ky *Digester) LoadFile(filename string) (err error) {
 func (ky *Digester) LoadStream(input io.Reader) (err error) {
 	defer Catch(&err)
 	ky.Filename = "(stream)"
+	ky.BaseDirectory = Try(os.Getwd())
 	if ky.options.lockFileName != "" {
 		Check(ky.configureLockfile())
 	}
@@ -340,6 +348,11 @@ func (ky *Digester) read(input io.Reader) (err error) {
 // identifying and processing them into a list of [types.Resource] items in [Digester.Resources].
 func (ky *Digester) readDocs() (err error) {
 	log := slog.With("file", ky.Filename, "ndocs", len(ky.Docs))
+	baseDir := ky.BaseDirectory
+	if baseDir == "" {
+		abs := Try(filepath.Abs(ky.Filename))
+		baseDir = filepath.Dir(abs)
+	}
 	ky.Resources = make([]types.Resource, len(ky.Docs))
 nextDoc:
 	for n, doc := range ky.Docs {
@@ -351,13 +364,13 @@ nextDoc:
 			if K8S_LIST.Match(doc) {
 				subD := newSubDigester(ky)
 				listRes := DigesterResource{digester: subD}
-				Check(listRes.Load(doc))
+				Check(listRes.Load(doc, baseDir))
 				ky.Resources[n] = listRes
 				log.Debug("{{.file}}: document {{.ndoc}} is a List")
 				continue nextDoc
 			}
 			if handler := reg.Handler.Match(doc, ky.imageDigester, ky); handler != nil {
-				Check(handler.Load(doc))
+				Check(handler.Load(doc, baseDir))
 				ky.Resources[n] = handler
 				log.Debug("{{.file}}: document {{.ndoc}} is a {{.regname}}", "regname", reg.Name)
 				continue nextDoc
@@ -365,7 +378,7 @@ nextDoc:
 		}
 		log.Debug("{{.file}}: document {{.ndoc}} is a generic Kubernetes resource")
 		ky.Resources[n] = &SimpleResource{doc}
-		Check(ky.Resources[n].Load(doc))
+		Check(ky.Resources[n].Load(doc, baseDir))
 	}
 	return
 }

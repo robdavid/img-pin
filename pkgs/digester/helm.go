@@ -161,6 +161,9 @@ func groupToDetails(root *yaml.Node, group yu.EntryGroup) (details ImageDetails,
 }
 
 func searchForImageDetails(root *yaml.Node) (details []ImageDetails) {
+	if root == nil {
+		return nil
+	}
 	matches1 := yu.MatchManyWithNode(root, yu.PathOf("**", "image", `/^(registry|repository|tag|name)$/`))
 	matches2 := yu.MatchManyWithNode(root, yu.PathOf("**", `/^(imageName|imageTag|image)$/`))
 	// matches3 := yu.MatchManyWithNode(root, yu.PathOf("**", "image")) // Some charts allow direct image insertion
@@ -291,8 +294,8 @@ func (hp *HelmProcessor) Verify() (err error) {
 	return
 }
 
-func (hp *HelmProcessor) Load(doc *yaml.Node) error {
-	return hp.Deployment.Load(doc)
+func (hp *HelmProcessor) Load(doc *yaml.Node, baseDirectory string) error {
+	return hp.Deployment.Load(doc, baseDirectory)
 }
 
 func (hp *HelmProcessor) Save() (*yaml.Node, error) {
@@ -319,6 +322,9 @@ func (hp *HelmProcessor) CRDs() ([]*yaml.Node, error) {
 
 func SetResourceNamespace(doc *yaml.Node, namespace string) (err error) {
 	defer Catch(&err)
+	if namespace == "" {
+		return nil
+	}
 	if kind, ok := yu.Get[string](doc, "kind").GetOK(); ok {
 		if yu.Get[string](doc, "metadata", "namespace").IsEmpty() {
 			Check(yu.Put(doc, namespace, "metadata", "namespace"))

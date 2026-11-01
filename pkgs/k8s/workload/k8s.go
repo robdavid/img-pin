@@ -17,7 +17,7 @@ type K8SResource struct {
 	digester digester.YAMLDigester
 }
 
-func (k8s *K8SResource) Load(doc *yaml.Node) error {
+func (k8s *K8SResource) Load(doc *yaml.Node, baseDirectory string) error {
 	k8s.resource = doc
 	return nil
 }
