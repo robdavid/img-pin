@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/robdavid/img-pin/pkgs/digester/types"
@@ -27,8 +29,6 @@ var (
 func HelmVersionAtLeast(version string) bool {
 	return semver.Compare(HelmBinary.Version().GetOr("v0"), version) >= 0
 }
-
-
 
 type ChartName struct {
 	Chart string
@@ -65,13 +65,17 @@ func ParseChartName(chart string) (chartName ChartName) {
 	return
 }
 
-
 func LoadDefaultValues(options types.HelmOptions) (root *yaml.Node, err error) {
 	if options.ChartName == "" {
 		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
 		return
 	}
-	helmCommand := []string{HelmBinary.Value(), "show", "values", options.ChartName}
+	chartName := options.ChartName
+	_, statErr := os.Stat(filepath.Join(options.BaseDirectory, options.ChartName))
+	if statErr == nil {
+		chartName = filepath.Join(options.BaseDirectory, options.ChartName)
+	}
+	helmCommand := []string{HelmBinary.Value(), "show", "values", chartName}
 	if options.Version != "" {
 		helmCommand = append(helmCommand, "--version", options.Version)
 	}
@@ -79,14 +83,9 @@ func LoadDefaultValues(options types.HelmOptions) (root *yaml.Node, err error) {
 		helmCommand = append(helmCommand, "--repo", options.Repository)
 	}
 	var valueData []byte
-	if options.BaseDirectory != "" {
-		if valueData, err = run.RunInDir(options.BaseDirectory, helmCommand...); err != nil {
-			return
-		}
-	} else {
-		if valueData, err = run.Run(helmCommand...); err != nil {
-			return
-		}
+
+	if valueData, err = run.Run(helmCommand...); err != nil {
+		return
 	}
 	var yamlRoot yaml.Node
 	err = yaml.Unmarshal(valueData, &yamlRoot)

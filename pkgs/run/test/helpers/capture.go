@@ -14,11 +14,11 @@ import (
 // It delegates to the underlying function whilst capturing the commands and their results and placing the results in crs.
 func CaptureWrap(crs *CommandResponses) (cleanup func()) {
 	wrapper := func(wrapped run.RunFunc) run.RunFunc {
-		return func(args ...string) ([]byte, error) {
+		return func(options run.RunOptions) ([]byte, error) {
 			var err error
 			var response []byte
-			cr := CommandResponse{CmdAndArgs: args}
-			if response, err = wrapped(args...); err != nil {
+			cr := CommandResponse{CmdAndArgs: options.Args}
+			if response, err = wrapped(options); err != nil {
 				cr.Error = &CommandError{Text: err.Error()}
 				var runError *run.RunError
 				if errors.As(err, &runError) {
