@@ -1,10 +1,34 @@
 package k8s
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
+
+	"github.com/robdavid/img-pin/pkgs/digester/types"
+	k8stypes "github.com/robdavid/img-pin/pkgs/k8s/types"
+	"github.com/robdavid/img-pin/pkgs/run"
+	"go.yaml.in/yaml/v3"
+	"golang.org/x/mod/semver"
 )
+
+const (
+	DefaultHelmBinary = "helm"
+)
+
+var (
+	ErrInsufficientChartData = errors.New("insufficient data to determine chart details")
+
+	HelmBinary = k8stypes.HelmOpt{EnvOpt: k8stypes.EnvOpt{Env: "IMG_PIN_HELM", DefaultValue: "helm"}}
+)
+
+func HelmVersionAtLeast(version string) bool {
+	return semver.Compare(HelmBinary.Version().GetOr("v0"), version) >= 0
+}
 
 type ChartName struct {
 	Chart string
@@ -38,5 +62,33 @@ func ParseChartName(chart string) (chartName ChartName) {
 		chartName.Chart = chart
 		chartName.Base = chart
 	}
+	return
+}
+
+func LoadDefaultValues(options types.HelmOptions) (root *yaml.Node, err error) {
+	if options.ChartName == "" {
+		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
+		return
+	}
+	chartName := options.ChartName
+	_, statErr := os.Stat(filepath.Join(options.BaseDirectory, options.ChartName))
+	if statErr == nil {
+		chartName = filepath.Join(options.BaseDirectory, options.ChartName)
+	}
+	helmCommand := []string{HelmBinary.Value(), "show", "values", chartName}
+	if options.Version != "" {
+		helmCommand = append(helmCommand, "--version", options.Version)
+	}
+	if options.Repository != "" {
+		helmCommand = append(helmCommand, "--repo", options.Repository)
+	}
+	var valueData []byte
+
+	if valueData, err = run.Run(helmCommand...); err != nil {
+		return
+	}
+	var yamlRoot yaml.Node
+	err = yaml.Unmarshal(valueData, &yamlRoot)
+	root = &yamlRoot
 	return
 }

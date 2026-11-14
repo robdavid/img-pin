@@ -27,7 +27,7 @@ const (
 type BaseResource interface {
 
 	// Load populates the resource with raw YAML data provided in the doc parameter.
-	Load(doc *yaml.Node) error
+	Load(doc *yaml.Node, baseDirectory string) error
 
 	// Save returns YAML data that represents the current state of the resource.
 	Save() (*yaml.Node, error)
@@ -65,11 +65,12 @@ type Resource interface {
 
 // HelmOptions holds basic deployment options
 type HelmOptions struct {
-	ChartName    string
-	InstanceName string
-	Repository   string
-	Version      string
-	Namespace    string
+	ChartName     string
+	InstanceName  string
+	Repository    string
+	Version       string
+	Namespace     string
+	BaseDirectory string
 }
 
 // Deployment represents a Helm deployment resource (such as a HelmChart).

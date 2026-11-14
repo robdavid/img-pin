@@ -45,14 +45,14 @@ type MockState struct {
 	EqualFunc ArgEqual
 }
 
-func (ms *MockState) Run(args ...string) ([]byte, error) {
+func (ms *MockState) Run(options run.RunOptions) ([]byte, error) {
 	next := ms.Responses[ms.Expected]
-	if len(args) != len(next.CmdAndArgs) {
-		return nil, fmt.Errorf("%w %v; expected %v", ErrNoMatch, args, next.CmdAndArgs)
+	if len(options.Args) != len(next.CmdAndArgs) {
+		return nil, fmt.Errorf("%w %v; expected %v", ErrNoMatch, options.Args, next.CmdAndArgs)
 	}
-	for i := range args {
-		if (ms.EqualFunc == nil && args[i] != next.CmdAndArgs[i]) || !ms.EqualFunc(args, next.CmdAndArgs, i) {
-			return nil, fmt.Errorf("%w %v; expected %v - mismatch at position %d", ErrNoMatch, args, next.CmdAndArgs, i)
+	for i := range options.Args {
+		if (ms.EqualFunc == nil && options.Args[i] != next.CmdAndArgs[i]) || !ms.EqualFunc(options.Args, next.CmdAndArgs, i) {
+			return nil, fmt.Errorf("%w %v; expected %v - mismatch at position %d", ErrNoMatch, options.Args, next.CmdAndArgs, i)
 		}
 	}
 	ms.Expected++

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+helmGlobals:
+  chartHome: charts
+helmCharts:
+  - name: nginx-ingress
+    releaseName: nginx-ingress
+    version: 1.1.0
+    namespace: kube-system
+    valuesInline:
+      controller:
+        service:
+          httpPort:
+            port: 8080
+          httpsPort:
+            port: 8443

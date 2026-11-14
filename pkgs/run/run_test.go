@@ -3,6 +3,8 @@ package run_test
 import (
 	"errors"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/robdavid/img-pin/pkgs/run"
@@ -100,6 +102,99 @@ func TestRunStdoutOnError(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 	out, err := run.Run("sh", "-c", "echo stdout data; echo stderr data >&2; exit 1")
+	require.Error(err)
+	assert.Equal([]byte("stdout data\n"), out)
+}
+
+func TestRunInDirSuccess(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	dir := t.TempDir()
+	out, err := run.RunInDir(dir, "echo", "hello")
+	require.NoError(err)
+	assert.Equal([]byte("hello\n"), out)
+}
+
+func TestRunInDirUsesWorkingDirectory(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	dir := t.TempDir()
+	out, err := run.RunInDir(dir, "pwd")
+	require.NoError(err)
+	// Resolve symlinks (e.g. /tmp -> /private/tmp) before comparing.
+	expected, err := filepath.EvalSymlinks(dir)
+	require.NoError(err)
+	actual, err := filepath.EvalSymlinks(strings.TrimSpace(string(out)))
+	require.NoError(err)
+	assert.Equal(expected, actual)
+}
+
+func TestRunInDirMultipleArgs(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir(), "echo", "hello", "world")
+	require.NoError(err)
+	assert.Equal([]byte("hello world\n"), out)
+}
+
+func TestRunInDirExitErrorCapturesStderr(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir(), "sh", "-c", "echo hello from stderr >&2; echo hello from stdout; exit 1")
+	require.Error(err)
+	assert.Equal([]byte("hello from stdout\n"), out)
+	var runErr *run.RunError
+	require.ErrorAs(err, &runErr)
+	assert.Equal([]byte("hello from stderr\n"), runErr.Stderr)
+	var exitErr *exec.ExitError
+	require.ErrorAs(err, &exitErr)
+}
+
+func TestRunInDirNoArgs(t *testing.T) {
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir())
+	assert.Error(err)
+	assert.Empty(out)
+	assert.Contains(err.Error(), "no command")
+}
+
+func TestRunInDirCommandNotFound(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir(), "nonexistent_command_xyz")
+	require.Error(err)
+	assert.Empty(out)
+	var runErr *run.RunError
+	require.ErrorAs(err, &runErr)
+	assert.Empty(runErr.Stderr)
+	var pathErr *exec.Error
+	require.ErrorAs(err, &pathErr)
+	assert.Equal("nonexistent_command_xyz", pathErr.Name)
+}
+
+func TestRunInDirSuccessNoOutput(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir(), "true")
+	require.NoError(err)
+	assert.Empty(out)
+}
+
+func TestRunInDirExitErrorNoStdout(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir(), "sh", "-c", "exit 42")
+	require.Error(err)
+	assert.Empty(out)
+	var exitErr *exec.ExitError
+	require.ErrorAs(err, &exitErr)
+	assert.Equal(42, exitErr.ExitCode())
+}
+
+func TestRunInDirStdoutOnError(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+	out, err := run.RunInDir(t.TempDir(), "sh", "-c", "echo stdout data; echo stderr data >&2; exit 1")
 	require.Error(err)
 	assert.Equal([]byte("stdout data\n"), out)
 }

@@ -69,7 +69,7 @@ func TestDigest(t *testing.T) {
 		docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 		require.Equal(2, len(docs))
 		deployment := k3s.HelmChartDeployment{}
-		deployment.Load(docs[1])
+		deployment.Load(docs[1], "")
 		helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
 		Check(helmProc.LoadDefaultImages())
 		require.Equal(10, len(helmProc.Images))
@@ -84,7 +84,7 @@ func TestDigest(t *testing.T) {
 		docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 		require.Equal(2, len(docs))
 		deployment := k3s.HelmChartDeployment{}
-		deployment.Load(docs[1])
+		deployment.Load(docs[1], "")
 		value := yu.Get[string](Try(deployment.Values()), "expose", "ingress", "hosts", "core")
 		assert.Equal(opt.Value("harbor.domain"), value)
 	}))
@@ -93,7 +93,7 @@ func TestDigest(t *testing.T) {
 		docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 		require.Equal(2, len(docs))
 		deployment := k3s.HelmChartDeployment{}
-		deployment.Load(docs[1])
+		deployment.Load(docs[1], "")
 		helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
 		Check(helmProc.LoadDefaultImages())
 		Check(helmProc.ResolveOverrides())
@@ -106,7 +106,7 @@ func TestDigest(t *testing.T) {
 		docs := Try(yu.ReadDocs("tests/harbor.yaml"))
 		require.Equal(2, len(docs))
 		deployment := k3s.HelmChartDeployment{}
-		deployment.Load(docs[1])
+		deployment.Load(docs[1], "")
 		helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
 		Check(helmProc.Digest())
 		deployment.Save()
@@ -116,11 +116,12 @@ func TestDigest(t *testing.T) {
 		docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
 		require.Equal(1, len(docs))
 		deployment := k3s.HelmChartDeployment{}
-		deployment.Load(docs[0])
+		deployment.Load(docs[0], "")
 		helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
 		Check(helmProc.Digest())
 		Try(deployment.Save())
 		resources := Try(deployment.Render())
+		assert.Equal(10, len(resources))
 		for _, resource := range resources {
 			if kind, ok := yu.Get[string](resource, "kind").GetOK(); ok && kind == "Service" {
 				type obj = map[string]any
@@ -140,7 +141,7 @@ func TestDigest(t *testing.T) {
 		docs := Try(yu.ReadDocs("tests/nginx-ingress.yaml"))
 		require.Equal(1, len(docs))
 		deployment := k3s.HelmChartDeployment{}
-		deployment.Load(docs[0])
+		deployment.Load(docs[0], "")
 		helmProc := digester.MakeHelmProcessor(&deployment, noSkipOptions{}, digester.NonLockingImageDigester{})
 		crds := Try(helmProc.CRDs())
 		assert.Equal(12, len(crds))

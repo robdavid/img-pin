@@ -23,13 +23,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-const (
-	DefaultHelmBinary = "helm"
-)
 
-var (
-	ErrInsufficientChartData = errors.New("insufficient data to determine chart details")
-)
 
 var K3S_HELM_CHART yu.Signature = yu.Signature{
 	Tests: []yu.SigPath{
@@ -57,7 +51,7 @@ type HelmChartDeployment struct {
 }
 
 // Load loads spec data from a HelmChart node
-func (hc *HelmChartDeployment) Load(doc *yaml.Node) (err error) {
+func (hc *HelmChartDeployment) Load(doc *yaml.Node, baseDirectory string) (err error) {
 	hc.options = types.HelmOptions{
 		InstanceName: yu.Get[string](doc, "metadata", "name").GetOr(""),
 		ChartName:    yu.Get[string](doc, "spec", "chart").GetOr(""),
@@ -103,7 +97,7 @@ func (hc *HelmChartDeployment) processSet(doc *yaml.Node) (err error) {
 func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 	defer Catch(&err)
 	if hc.options.ChartName == "" {
-		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
+		err = fmt.Errorf("%w: chart name not found", k8s.ErrInsufficientChartData)
 		return
 	}
 	fh := Try(os.CreateTemp("", "helmchart-values-*.yaml"))
@@ -135,31 +129,15 @@ func (hc *HelmChartDeployment) Render() (docs []*yaml.Node, err error) {
 }
 
 func (hc *HelmChartDeployment) DefaultValues() (root *yaml.Node, err error) {
-	if hc.options.ChartName == "" {
-		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
-		return
-	}
-	helmCommand := []string{HelmBinary.Value(), "show", "values", hc.options.ChartName}
-	if hc.options.Version != "" {
-		helmCommand = append(helmCommand, "--version", hc.options.Version)
-	}
-	if hc.options.Repository != "" {
-		helmCommand = append(helmCommand, "--repo", hc.options.Repository)
-	}
-	var valueData []byte
-	if valueData, err = run.Run(helmCommand...); err != nil {
-		return
-	}
-	var yamlRoot yaml.Node
-	err = yaml.Unmarshal(valueData, &yamlRoot)
-	root = &yamlRoot
+	defer Catch(&err)
+	root = Try(k8s.LoadDefaultValues(hc.options))
 	return
 }
 
 func (hc *HelmChartDeployment) CRDs() (docs []*yaml.Node, err error) {
 	defer Catch(&err)
 	if hc.options.ChartName == "" {
-		err = fmt.Errorf("%w: chart name not found", ErrInsufficientChartData)
+		err = fmt.Errorf("%w: chart name not found", k8s.ErrInsufficientChartData)
 		return
 	}
 	chartName := k8s.ParseChartName(hc.options.ChartName)

@@ -51,6 +51,7 @@ var CommonMockDigests = []MockDigest{
 	mkMock("64d8c73dca984af206adf9d6d7e46aa550362b1d7a01f3a0a91b20cc67868660", crusty, "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1"),
 	mkMock("c64a643dd665db62c43aa089432eb2e74b13364c616fc12ca524baead6ccc332", yesterday, "docker.io/openpolicyagent/gatekeeper:dev"),
 	errMock(images.ErrSchemaV1, "quay.io/dexidp/dex:v2.14.0"),
+	mkMock("6385602578fb7f7f663eed1a928420939593f1b01831ce99eb47286e2bed2452", past, "docker.io/nginx/nginx-ingress:3.4.0"),
 }
 
 var CommonMockDigests2 = slices.Affix(CommonMockDigests,
