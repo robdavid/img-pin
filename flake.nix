@@ -3,9 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-2605.url = "github:NixOS/nixpkgs/nixos-26.05";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, nixpkgs-2605 }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -14,13 +15,14 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          stable = nixpkgs-2605.legacyPackages.${system};
         in
         {
-          default = pkgs.buildGoModule {
+          default = stable.buildGo127Module {
             pname = "img-pin";
-            version = "0.4.2";
+            version = "0.5.2";
             src = self;
-            vendorHash = "sha256-gLbW0Rze9OB0junQI/8dY/4FMNbC9cwlCRQqrtXUZlc=";
+            vendorHash = "sha256-7jzu6/GNvuug6OExnOAjTfHMv3Mem5OqFZuOhAecB34=";
             checkFlags = [ "-short" ];
           };
         }
@@ -28,11 +30,12 @@
       devShells = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          stable = nixpkgs-2605.legacyPackages.${system};
         in
         {
           default = pkgs.mkShell {
             packages = with pkgs; [
-              go
+              stable.go_1_27
               gopls
               delve
               govulncheck
